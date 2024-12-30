@@ -7,11 +7,10 @@ class ObservationVar(TimeVar):
         TimeVar.__init__(self, None)
         self.__target = "sun"
         self.__observation = "dist"
-        self.__multiplier = 1 
+        self.__multiplier = multiplier
 
         self.ts = load.timescale()
         self.planets = load('de421.bsp')
-        self.multiplier =  multiplier
         self.north = north
         self.west = west    
         self.target = target
@@ -57,16 +56,19 @@ class ObservationVar(TimeVar):
         earth, target = self.planets['earth'], self.planets[self.target]
         location = earth + wgs84.latlon(self.north * N, self.west-1.6830 * W)
         astrometric = location.at(t).observe(target)
-        alt, az, distance = astrometric.apparent().altaz()
-        if self.observation == "dist":
-            value = int(self.multiplier * distance.km)
-        if self.observation == "alt":
-            value = int(self.multiplier * alt.arcseconds())
-        if self.observation == "azi":
-            value = int(self.multiplier * az.arcseconds())
+        altO, azO, distanceO = astrometric.apparent().altaz()
+        #print(altO, azO, distanceO)
+        altaz = {
+            "alt"  : altO.degrees,
+            "azi"  : azO.degrees,
+            "dist" : distanceO.km
+        }
+
+        value = int(self.multiplier * altaz[self.observation])
+
         if(self.debug):
             self.debug = False
-            print(f"target={self.target}, observation = {self.observation}, value={value}, dist={distance.km}, alt={alt.arcseconds()}, azi={az.arcseconds()}")    
+            print(f"target={self.target}, observation = {self.observation}, value={value}, dist={altaz['dist']}, alt={altaz['alt']}, azi={altaz['azi']}")    
         self.current_value = self.calculate(value)
         return self.current_value
         
