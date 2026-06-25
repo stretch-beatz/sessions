@@ -5,6 +5,7 @@ await init()
 
 /*
 80s power ballads
+    Intro > Verse > Pre-Chorus > Verse > Pre-Chorus > Chorus > Guitar Solo > Bridge > Final Chorus (Key Change) > Outro.
     70-90 bpm (or 130+ halftime)
     Belting vocals
     Synth strings
@@ -44,7 +45,7 @@ Verse: G - D - Em - C. Chorus: C - D - Em - C
 */
 const G_major_I = ["<G D Em C>", "C D Em F"]
 
-const chords = G_major_I
+const chords = A_minor_vi
 
 
 
@@ -65,104 +66,11 @@ const keyChange = "0*4 2*2".slow(16)
 
 
 // Constant emotional escalation
-/*
-midnight is fading broken silence
-heart is beating heavy pressure
-echo is calling distant echoes
-shadow is holding shattered pieces
-
-Say shadow
-Say echo
-Say heart
-Say midnight
-
-fire is burning through the darkness
-memory is pulling fragile fragments
-dream is breaking under tension
-time is cutting open channels
-
-Say time
-Say dream
-Say memory
-Say fire
-
-echo is rising higher still
-echo is rising through the pain
-echo is rising past the damage
-echo is rising once again
-
-Say echo
-Say echo
-Say echo
-Say echo
-
-Put midnight into heart
-Put heart into fire
-Put heart into fire
-Put echo with fire into shadow
-
-Say echo
-Say heart
-Say heart
-Say midnight
-*/
-/*
-midnight is fading broken silence
-heart is beating heavy pressure
-echo is calling distant echoes
-shadow is holding shattered pieces
-
-fire is burning through the darkness
-memory is pulling fragile fragments
-dream is breaking under tension
-time is cutting open channels
-
-echo is rising higher still
-echo is rising through the pain
-echo is rising past the damage
-echo is rising once again
-
-Put midnight into heart
-Put heart into fire
-Put echo with fire into shadow
-
-Say shadow
-Say fire
-Say heart
-Say echo
-*/
-/*
-midnight is fading broken silence
-heart is beating heavy pressure
-echo is calling distant echoes
-shadow is holding shattered pieces
-
-fire is burning through the darkness
-memory is pulling fragile fragments
-dream is breaking under tension
-time is cutting open channels
-
-echo is rising higher still
-echo is rising through the pain
-echo is rising past the damage
-echo is rising once again
-
-Put midnight into heart
-Put heart into fire
-Put echo with fire into shadow
-
-Say shadow
-Say fire
-Say heart
-Say echo
-*/
-
 
 $: sBD
 
 // Rockstar for verse 1
 const prog = await rockstar_pro`
-
 midnight is fading broken silence
 heart is beating heavy pressure
 echo is calling distant echoes
@@ -204,7 +112,104 @@ Say heart
 Say midnight
 `
 
-const super_pattern = "5 5 6 8"
+class Song{
+  super_pattern = "5 5 6 8"
+  sections = {}
+  order = []
+  tune_pos = 0
+  lyric_pos = 0
+  
+  constructor(prog){
+    this.prog = prog
+
+    this.addSection('Intro', Intro)
+    this.addSection('Verse1', Verse)
+    this.addSection('PreChorus', PreChorus)
+    this.addSection('Chorus', Chorus)
+    this.addSection('Verse2', Verse)
+    this.addSection('Verse3', Verse)
+    this.addSection('GuitarSolo', GuitarSolo)
+    this.addSection('Bridge', Bridge)
+    this.addSection('Chorus2',Chorus)
+    this.addSection('Outro', Outro)
+    
+    this.order = ['Intro', 'Verse1', 'PreChorus', 
+      //'Verse2', 'PreChorus', 'Chorus',
+      //'Verse3', 'PreChorus', 'Chorus',
+      //'GuitarSolo', 'Bridge', 'Chorus2', 'Outro'
+      ]
+  }
+
+  addSection(name, class_obj){
+    var new_section = new class_obj()
+    new_section.numbers = this.prog.output.slice(this.tune_pos , this.tune_pos + this.len)
+    new_section.lyric
+  
+  }
+}
+
+class Section {
+  len = 4
+  advance_tune = null
+  advance_lyrics = 0
+  has_lyrics = false
+  numbers = null
+  
+  constructor(height, width) {
+    this.height = height;
+    this.width = width;
+    //Intro > Verse > PreChorus > Verse > PreChorus > Chorus > GuitarSolo > Bridge > (Key Change) Chorus > Outro
+
+  }
+  
+  // Getter
+  get area() {
+    return this.calcArea();
+  }
+  // Method
+  calcArea() {
+    return this.height * this.width;
+  }
+}
+
+//Intro > Verse > Pre-Chorus > Verse > Pre-Chorus > Chorus > Guitar Solo > Bridge > Final Chorus (Key Change) > Outro.
+class Intro extends Section {
+  len = 2
+  tune_start = 0
+}
+
+class Verse extends Section {
+  len = 4
+  tune_start = 0
+  lyrics_start = 0
+}
+
+class PreChorus extends Section {
+  len = 2
+  tune_start = 0
+}
+
+class Chorus extends Section {
+  len = 4
+  tune_start = 0
+  lyrics_start = 0
+}
+
+
+class GuitarSolo extends Section {
+  len = 8
+  tune_start = 0
+}
+
+class Bridge extends Section {
+  len = 2
+  tune_start = 0
+}
+
+class Outro extends Section {
+  len = 8
+  tune_start = 0
+}
 
 const verse_numbers = prog.output.slice(0,4)
 const verse_tune = base(verse_numbers, super_pattern.slow(4), 5 )
@@ -218,16 +223,17 @@ console.log('chorus_numbers', chorus_numbers)
 
 
 // $: n("<0,1,2> <0,1,3>").
-$:  s(iStrings)
+var groups = {  
+  'strings' : s(iStrings)
   //n().scale(start_scale)
   .chord(chords[0]).slow(2)
   .voicing()
   .transpose(keyChange)
-  .gain(0.3)._punchcard()
-
-
-
-$:  s(iPiano)
+  .gain(0.3)
+  .color('lightblue')
+  ,
+ 'piano':
+s(iPiano)
  //.n()
   .n(verse_tune)
  .scale(start_scale)
@@ -238,7 +244,10 @@ $:  s(iPiano)
 
   // .every(8 ,(x)=>x.iterback(4))
   // .clip(verse_rythm.slow(2).mul(0.25))
-  ._punchcard()
+  .color('lightgreen')
+}
+
+$: stack(Object.values(groups)).punchcard()
 
 $_:  s(iPiano)
  //.n()
