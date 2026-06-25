@@ -117,7 +117,7 @@ class Song{
   sections = {}
   order = []
   tune_pos = 0
-  lyric_pos = 0
+  verse_lyrics_pos = 0
   
   constructor(prog){
     this.prog = prog
@@ -142,24 +142,29 @@ class Song{
 
   addSection(name, class_obj){
     var new_section = new class_obj()
-    new_section.numbers = this.prog.output.slice(this.tune_pos , this.tune_pos + this.len)
-    new_section.lyric
-  
+    new_section.numbers = this.prog.output.slice(this.tune_start , this.tune_start + this.src_len)
+    if(new_section.has_lyrics){
+      new_section.lyrics = this.prog.speech.slice(this.lyrics_pos , this.lyrics_pos + this_src.len)
+      this.verse_lyrics_pos += new_section.advance_verse_lyrics
+    }
+    console.log('new_section', new_section)
+ 
   }
 }
 
 class Section {
-  len = 4
-  advance_tune = null
-  advance_lyrics = 0
+  src_len = 4
+  play_len = 4
+  tune_start = 0
+  advance_verse_lyrics = 0
   has_lyrics = false
   numbers = null
-  
+  lyrics = null
+  /*
   constructor(height, width) {
     this.height = height;
     this.width = width;
     //Intro > Verse > PreChorus > Verse > PreChorus > Chorus > GuitarSolo > Bridge > (Key Change) Chorus > Outro
-
   }
   
   // Getter
@@ -169,46 +174,59 @@ class Section {
   // Method
   calcArea() {
     return this.height * this.width;
-  }
+  }*/
 }
 
 //Intro > Verse > Pre-Chorus > Verse > Pre-Chorus > Chorus > Guitar Solo > Bridge > Final Chorus (Key Change) > Outro.
 class Intro extends Section {
-  len = 2
-  tune_start = 0
+  src_len = 2
+  strings = "gm_violin"
 }
 
 class Verse extends Section {
-  len = 4
-  tune_start = 0
-  lyrics_start = 0
+  advance_verse_lyrics = 8
+  has_lyrics = true
+  strings = "gm_violin, gm_viola"
+  piano = "gm_piano"
 }
 
 class PreChorus extends Section {
-  len = 2
-  tune_start = 0
+  src_len = 2
+  tune_start = 3
+  strings = "gm_viola"
+  guitar = "gm_overdriven_guitar"
 }
 
 class Chorus extends Section {
-  len = 4
-  tune_start = 0
-  lyrics_start = 0
+  src_len = 4
+  tune_start = 4
+  has_lyrics = true
+  piano = "gm_piano"
+  strings = "gm_viola"
+  guitar = "gm_overdriven_guitar"
 }
 
-
 class GuitarSolo extends Section {
-  len = 8
-  tune_start = 0
+  src_len = 3
+  play_len = 4
+  tune_start = 12
+  guitar = "gm_overdriven_guitar"
 }
 
 class Bridge extends Section {
-  len = 2
-  tune_start = 0
+  src_len = 2
+  play_len = 2
+  tune_start = 6
+  piano = "gm_piano"
+  strings = "gm_viola"
 }
 
 class Outro extends Section {
-  len = 8
-  tune_start = 0
+  src_len = 2
+  play_len = 4
+  tune_start = 10
+  piano = "gm_piano"
+  guitar = "gm_overdriven_guitar"
 }
 
 const verse_numbers = prog.output.slice(0,4)
