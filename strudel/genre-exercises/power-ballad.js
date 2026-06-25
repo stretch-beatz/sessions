@@ -45,8 +45,6 @@ Verse: G - D - Em - C. Chorus: C - D - Em - C
 */
 const G_major_I = ["<G D Em C>", "C D Em F"]
 
-const chords = A_minor_vi
-
 
 
 // Belting vocals // sax lines
@@ -118,6 +116,7 @@ class Song{
   order = []
   tune_pos = 0
   verse_lyrics_pos = 0
+  chord_set = A_minor_vi
   
   constructor(prog){
     this.prog = prog
@@ -147,7 +146,7 @@ class Song{
       new_section.lyrics = this.prog.speech.slice(this.lyrics_pos , this.lyrics_pos + this_src.len)
       this.verse_lyrics_pos += new_section.advance_verse_lyrics
     }
-    console.log('new_section', new_section)
+    console.log('new_section', new_section, this.verse_lyrics_pos)
  
   }
 }
@@ -158,13 +157,46 @@ class Section {
   tune_start = 0
   advance_verse_lyrics = 0
   has_lyrics = false
-  numbers = null
+  #numbers = null
   lyrics = null
-  /*
-  constructor(height, width) {
-    this.height = height;
-    this.width = width;
-    //Intro > Verse > PreChorus > Verse > PreChorus > Chorus > GuitarSolo > Bridge > (Key Change) Chorus > Outro
+  chords = []
+  chord_type = 0
+  transpose = 0
+  
+  constructor() {
+  }
+
+  set numbers(numbers){
+    this.#numbers = numbers
+    this.tune = base(this.numbers, super_pattern.slow(4), 6 )
+    this.rhythm = base(chorus_numbers, super_pattern.slow(4), 5 )
+  }
+
+// $: n("<0,1,2> <0,1,3>").
+var groups = {  
+  'strings' : s(iStrings)
+  //n().scale(start_scale)
+  .chord(chords[0]).slow(2)
+  .voicing()
+  .transpose(keyChange)
+  .gain(0.3)
+  .color('lightblue')
+  ,
+ 'piano':
+s(iPiano)
+ //.n()
+  .n(verse_tune)
+ .scale(start_scale)
+  .euclidLegato(verse_rythm.slow(2),8)
+  .chord(chords[0])
+  .voicing()
+  .transpose(keyChange)
+
+  // .every(8 ,(x)=>x.iterback(4))
+  // .clip(verse_rythm.slow(2).mul(0.25))
+  .color('lightgreen')
+}
+
   }
   
   // Getter
@@ -204,6 +236,7 @@ class Chorus extends Section {
   piano = "gm_piano"
   strings = "gm_viola"
   guitar = "gm_overdriven_guitar"
+  chord_type = 1
 }
 
 class GuitarSolo extends Section {
@@ -211,6 +244,7 @@ class GuitarSolo extends Section {
   play_len = 4
   tune_start = 12
   guitar = "gm_overdriven_guitar"
+  chord_type = 1
 }
 
 class Bridge extends Section {
@@ -219,6 +253,7 @@ class Bridge extends Section {
   tune_start = 6
   piano = "gm_piano"
   strings = "gm_viola"
+  chord_type = 1
 }
 
 class Outro extends Section {
@@ -227,6 +262,8 @@ class Outro extends Section {
   tune_start = 10
   piano = "gm_piano"
   guitar = "gm_overdriven_guitar"
+  chord_type = 1
+  transpose = 1
 }
 
 const verse_numbers = prog.output.slice(0,4)
@@ -236,7 +273,7 @@ console.log('verse_numbers', verse_numbers)
 
 const chorus_numbers = prog.output.slice(4,8)
 const chorus_tune = base(chorus_numbers, super_pattern.slow(4), 6 )
-const chorus_rythm = base(chorus_numbers, super_pattern.slow(4), 5 )
+const chorus_rhythm = base(chorus_numbers, super_pattern.slow(4), 5 )
 console.log('chorus_numbers', chorus_numbers)
 
 
