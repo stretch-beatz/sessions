@@ -116,7 +116,9 @@ class Song{
   order = []
   tune_pos = 0
   verse_lyrics_pos = 0
+  start_scale = "a:minor"
   chord_set = A_minor_vi
+  
   
   constructor(prog){
     this.prog = prog
@@ -140,14 +142,23 @@ class Song{
   }
 
   addSection(name, class_obj){
-    var new_section = new class_obj()
+    var new_section = new class_obj(this.start_scale)
     new_section.numbers = this.prog.output.slice(this.tune_start , this.tune_start + this.src_len)
     if(new_section.has_lyrics){
       new_section.lyrics = this.prog.speech.slice(this.lyrics_pos , this.lyrics_pos + this_src.len)
       this.verse_lyrics_pos += new_section.advance_verse_lyrics
     }
     console.log('new_section', new_section, this.verse_lyrics_pos)
- 
+    this.sections[name] = new_section
+  }
+
+  get arrangment(){
+    var new_arrangement = this.order(section_name =>{
+      return [section_name.play_len, this.sections[sections_name].stack]
+    })
+    console.log("arrangment", new_arrangment)
+    
+    
   }
 }
 
@@ -162,80 +173,84 @@ class Section {
   chords = []
   chord_type = 0
   transpose = 0
+  tune_limit = "6"
+  rhythm_limit = "5"
+  instruments = {}
+  #stack = null
+  scale = null
   
-  constructor() {
+  constructor(base_scale) {
+    this.scale = base_scale
   }
 
   set numbers(numbers){
     this.#numbers = numbers
-    this.tune = base(this.numbers, super_pattern.slow(4), 6 )
-    this.rhythm = base(chorus_numbers, super_pattern.slow(4), 5 )
+    this.tune = base(this.numbers, super_pattern.slow(this.play_len), this.tune_limit )
+    this.rhythm = base(chorus_numbers, super_pattern.slow(this.play_len), this.rhythm_limit )
+    this.rhythm = base(chorus_numbers, this.play_len, this.rhythm_base )
   }
 
-// $: n("<0,1,2> <0,1,3>").
-var groups = {  
-  'strings' : s(iStrings)
-  //n().scale(start_scale)
-  .chord(chords[0]).slow(2)
-  .voicing()
-  .transpose(keyChange)
-  .gain(0.3)
-  .color('lightblue')
-  ,
- 'piano':
-s(iPiano)
- //.n()
-  .n(verse_tune)
- .scale(start_scale)
-  .euclidLegato(verse_rythm.slow(2),8)
-  .chord(chords[0])
-  .voicing()
-  .transpose(keyChange)
-
-  // .every(8 ,(x)=>x.iterback(4))
-  // .clip(verse_rythm.slow(2).mul(0.25))
-  .color('lightgreen')
-}
-
+  get numbers(){
+    return this.#numbers
   }
-  
-  // Getter
-  get area() {
-    return this.calcArea();
+
+  build_stack(){
+    this.#stack = {}
+    if (this.instruments.hasOwnProperty('strings'){
+      this.#stack['strings'] :
+      s(this.instruments['strings'])
+      //n().scale(start_scale)
+     .chord(this.chords[this.chord_type]).slow(2)
+     .voicing()
+     .transpose(this.transpose)
+     .gain(0.3)
+     .color('lightblue')
+    }
+    
+  if (this.instruments.hasOwnProperty('piano'){
+      this.#stack['piano'] :
+      s(this.instruments['piano'])
+      .n(tune)
+      .scale(start_scale)
+      .euclidLegato(verse_rythm.slow(2),8)
+      .chord(this.chords[this.chord_type])
+      .voicing()
+      .transpose(keyChange)
+      .color('lightgreen')
+    }
   }
-  // Method
-  calcArea() {
-    return this.height * this.width;
-  }*/
+ 
+  get stack(){
+    if (this.#stack === null){
+      this.build_stack()
+    }
+    return stack(Object.values(this.#stack))
+  }
 }
 
 //Intro > Verse > Pre-Chorus > Verse > Pre-Chorus > Chorus > Guitar Solo > Bridge > Final Chorus (Key Change) > Outro.
 class Intro extends Section {
   src_len = 2
-  strings = "gm_violin"
+  instruments = {'strings':"gm_violin"}
 }
 
 class Verse extends Section {
   advance_verse_lyrics = 8
   has_lyrics = true
-  strings = "gm_violin, gm_viola"
-  piano = "gm_piano"
+  instruments = {'strings':"gm_violin, gm_viola",   'piano':"gm_piano"}
 }
 
 class PreChorus extends Section {
   src_len = 2
   tune_start = 3
-  strings = "gm_viola"
-  guitar = "gm_overdriven_guitar"
+  instruments = {'strings':"gm_viola",   'guitar':"gm_overdriven_guitar"}
 }
 
 class Chorus extends Section {
   src_len = 4
   tune_start = 4
   has_lyrics = true
-  piano = "gm_piano"
-  strings = "gm_viola"
-  guitar = "gm_overdriven_guitar"
+  instruments = {'strings':"gm_violin, gm_viola",   'guitar':"gm_overdriven_guitar"}
   chord_type = 1
 }
 
@@ -243,7 +258,7 @@ class GuitarSolo extends Section {
   src_len = 3
   play_len = 4
   tune_start = 12
-  guitar = "gm_overdriven_guitar"
+  instruments = {'guitar':"gm_overdriven_guitar"}
   chord_type = 1
 }
 
@@ -251,8 +266,7 @@ class Bridge extends Section {
   src_len = 2
   play_len = 2
   tune_start = 6
-  piano = "gm_piano"
-  strings = "gm_viola"
+  instruments = {'strings':"gm_viola", 'piano':"gm_piano"}
   chord_type = 1
 }
 
@@ -260,60 +274,13 @@ class Outro extends Section {
   src_len = 2
   play_len = 4
   tune_start = 10
-  piano = "gm_piano"
-  guitar = "gm_overdriven_guitar"
+  instruments = {'piano':"gm_piano", 'guitar':"gm_overdriven_guitar"}
   chord_type = 1
   transpose = 1
 }
 
-const verse_numbers = prog.output.slice(0,4)
-const verse_tune = base(verse_numbers, super_pattern.slow(4), 5 )
-const verse_rythm = base(verse_numbers, super_pattern.slow(4), 4)
-console.log('verse_numbers', verse_numbers)
-
-const chorus_numbers = prog.output.slice(4,8)
-const chorus_tune = base(chorus_numbers, super_pattern.slow(4), 6 )
-const chorus_rhythm = base(chorus_numbers, super_pattern.slow(4), 5 )
-console.log('chorus_numbers', chorus_numbers)
-
-
-// $: n("<0,1,2> <0,1,3>").
-var groups = {  
-  'strings' : s(iStrings)
-  //n().scale(start_scale)
-  .chord(chords[0]).slow(2)
-  .voicing()
-  .transpose(keyChange)
-  .gain(0.3)
-  .color('lightblue')
-  ,
- 'piano':
-s(iPiano)
- //.n()
-  .n(verse_tune)
- .scale(start_scale)
-  .euclidLegato(verse_rythm.slow(2),8)
-  .chord(chords[0])
-  .voicing()
-  .transpose(keyChange)
-
-  // .every(8 ,(x)=>x.iterback(4))
-  // .clip(verse_rythm.slow(2).mul(0.25))
-  .color('lightgreen')
-}
-
-$: stack(Object.values(groups)).punchcard()
-
-$_:  s(iPiano)
- //.n()
-  .n(chorus_tune)
- .scale(start_scale)
-  .euclidLegato(chorus_rythm.slow(2),8)
-  .chord(chords[0])
-  .voicing()
-  .transpose(keyChange)
-  ._punchcard()
-
+var song = new Song()
+$ : arrange{song.arrangement}
 
 // $_: n(base(prog.output).slow(2)).scale(my_scale). s("supersaw").gain(1.5)
 // samples('shabda/phonemes/en-GB/m:'+prog.speech.join(',')+'?force=0&overrides=papa:P_AA1_P_A')
