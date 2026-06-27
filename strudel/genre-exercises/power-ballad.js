@@ -192,9 +192,10 @@ class Song{
   verse_lyrics_pos = 0
   start_scale = "a:minor"
   chord_set = A_minor_vi
-  
+  prog = null
   
   constructor(prog){
+    console.log('Song{')
     this.prog = prog
 
     this.addSection('Intro', Intro)
@@ -216,6 +217,8 @@ class Song{
   }
 
   addSection(name, class_obj){
+    console.log('addSection(',name, class_obj)
+    console.log('class_obj', class_obj)
     var new_section = new class_obj(this.start_scale)
     new_section.numbers = this.prog.output.slice(this.tune_start , this.tune_start + this.src_len)
     if(new_section.has_lyrics){
