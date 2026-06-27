@@ -196,8 +196,8 @@ class Section {
 
   build_stack(){
     this.#stack = {}
-    if (this.instruments.hasOwnProperty('strings'){
-      this.#stack['strings'] :
+    if (this.instruments.hasOwnProperty('strings')){
+      this.#stack['strings'] =
       s(this.instruments['strings'])
       //n().scale(start_scale)
      .chord(this.chords[this.chord_type]).slow(2)
@@ -207,8 +207,8 @@ class Section {
      .color('lightblue')
     }
     
-  if (this.instruments.hasOwnProperty('piano'){
-      this.#stack['piano'] :
+  if (this.instruments.hasOwnProperty('piano')){
+      this.#stack['piano'] =
       s(this.instruments['piano'])
       .n(tune)
       .scale(start_scale)
@@ -280,7 +280,7 @@ class Outro extends Section {
 }
 
 var song = new Song()
-$ : arrange{song.arrangement}
+$ : arrange(song.arrangement)
 
 // $_: n(base(prog.output).slow(2)).scale(my_scale). s("supersaw").gain(1.5)
 // samples('shabda/phonemes/en-GB/m:'+prog.speech.join(',')+'?force=0&overrides=papa:P_AA1_P_A')
