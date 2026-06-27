@@ -72,7 +72,7 @@ class Section {
       this._stack['strings'] =
       s(this.instruments['strings'])
       //n().scale(start_scale)
-     .chord(this.chords[this.chord_type]).slow(2)
+     .chord(this.chords[this.chord_type])//.slow(2)
      .voicing()
      .transpose(this.transpose)
      .gain(0.3)
@@ -156,6 +156,7 @@ class Intro extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
+    this.play_len = 6
     this.instruments = { 'strings': "gm_violin" }
   }
 }
@@ -163,6 +164,8 @@ class Intro extends Section {
 class Verse extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
+    
+    this.play_len = 8
     this.advance_verse_lyrics = 8
     this.has_lyrics = true
     this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , 'drums': 2}
@@ -173,6 +176,7 @@ class PreChorus extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
+    this.play_len = 4
     this.tune_start = 3
     this.instruments = { 'strings': "gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 }
   }
@@ -182,6 +186,7 @@ class Chorus extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 4
+    this.play_len = 8
     this.tune_start = 4
     this.has_lyrics = true
     this.instruments = { 'strings': "gm_violin, gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 }
@@ -204,7 +209,7 @@ class Bridge extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
-    this.play_len = 2
+    this.play_len = 4
     this.tune_start = 6
     this.instruments = { 'strings': "gm_viola", 'piano': "gm_piano" , 'drums': 2}
     this.chord_type = 1
@@ -215,7 +220,7 @@ class Outro extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern)
     this.src_len = 2
-    this.play_len = 4
+    this.play_len = 12
     this.tune_start = 10
     this.instruments = { 'piano': "gm_piano", 'guitar': "gm_overdriven_guitar", 'drums': 2 }
     this.chord_type = 1
