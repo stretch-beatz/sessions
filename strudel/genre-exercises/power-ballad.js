@@ -65,102 +65,7 @@ const keyChange = "0*4 2*2".slow(16)
 
 // Constant emotional escalation
 
-$: sBD
 
-// Rockstar for verse 1
-const prog = await rockstar_pro`
-midnight is fading broken silence
-heart is beating heavy pressure
-echo is calling distant echoes
-shadow is holding shattered pieces
-
-Say shadow
-Say echo
-Say heart
-Say midnight
-
-fire is burning through the darkness
-memory is pulling fragile fragments
-dream is breaking under tension
-time is cutting open channels
-
-Say time
-Say dream
-Say memory
-Say fire
-
-echo is rising higher still
-echo is rising through the pain
-echo is rising past the damage
-echo is rising once again
-
-Say echo
-Say echo
-Say echo
-Say echo
-
-Put midnight into heart
-Put heart into fire
-Put heart into fire
-Put echo with fire into shadow
-
-Say echo
-Say heart
-Say heart
-Say midnight
-`
-
-class Song{
-  super_pattern = "5 5 6 8"
-  sections = {}
-  order = []
-  tune_pos = 0
-  verse_lyrics_pos = 0
-  start_scale = "a:minor"
-  chord_set = A_minor_vi
-  
-  
-  constructor(prog){
-    this.prog = prog
-
-    this.addSection('Intro', Intro)
-    this.addSection('Verse1', Verse)
-    this.addSection('PreChorus', PreChorus)
-    this.addSection('Chorus', Chorus)
-    this.addSection('Verse2', Verse)
-    this.addSection('Verse3', Verse)
-    this.addSection('GuitarSolo', GuitarSolo)
-    this.addSection('Bridge', Bridge)
-    this.addSection('Chorus2',Chorus)
-    this.addSection('Outro', Outro)
-    
-    this.order = ['Intro', 'Verse1', 'PreChorus', 
-      //'Verse2', 'PreChorus', 'Chorus',
-      //'Verse3', 'PreChorus', 'Chorus',
-      //'GuitarSolo', 'Bridge', 'Chorus2', 'Outro'
-      ]
-  }
-
-  addSection(name, class_obj){
-    var new_section = new class_obj(this.start_scale)
-    new_section.numbers = this.prog.output.slice(this.tune_start , this.tune_start + this.src_len)
-    if(new_section.has_lyrics){
-      new_section.lyrics = this.prog.speech.slice(this.lyrics_pos , this.lyrics_pos + this_src.len)
-      this.verse_lyrics_pos += new_section.advance_verse_lyrics
-    }
-    console.log('new_section', new_section, this.verse_lyrics_pos)
-    this.sections[name] = new_section
-  }
-
-  get arrangment(){
-    var new_arrangement = this.order(section_name =>{
-      return [section_name.play_len, this.sections[sections_name].stack]
-    })
-    console.log("arrangment", new_arrangment)
-    
-    
-  }
-}
 
 class Section {
   src_len = 4
@@ -279,7 +184,102 @@ class Outro extends Section {
   transpose = 1
 }
 
-var song = new Song()
+class Song{
+  super_pattern = "5 5 6 8"
+  sections = {}
+  order = []
+  tune_pos = 0
+  verse_lyrics_pos = 0
+  start_scale = "a:minor"
+  chord_set = A_minor_vi
+  
+  
+  constructor(prog){
+    this.prog = prog
+
+    this.addSection('Intro', Intro)
+    this.addSection('Verse1', Verse)
+    this.addSection('PreChorus', PreChorus)
+    this.addSection('Chorus', Chorus)
+    this.addSection('Verse2', Verse)
+    this.addSection('Verse3', Verse)
+    this.addSection('GuitarSolo', GuitarSolo)
+    this.addSection('Bridge', Bridge)
+    this.addSection('Chorus2',Chorus)
+    this.addSection('Outro', Outro)
+    
+    this.order = ['Intro', 'Verse1', 'PreChorus', 
+      //'Verse2', 'PreChorus', 'Chorus',
+      //'Verse3', 'PreChorus', 'Chorus',
+      //'GuitarSolo', 'Bridge', 'Chorus2', 'Outro'
+      ]
+  }
+
+  addSection(name, class_obj){
+    var new_section = new class_obj(this.start_scale)
+    new_section.numbers = this.prog.output.slice(this.tune_start , this.tune_start + this.src_len)
+    if(new_section.has_lyrics){
+      new_section.lyrics = this.prog.speech.slice(this.lyrics_pos , this.lyrics_pos + this_src.len)
+      this.verse_lyrics_pos += new_section.advance_verse_lyrics
+    }
+    console.log('new_section', new_section, this.verse_lyrics_pos)
+    this.sections[name] = new_section
+  }
+
+  get arrangment(){
+    var new_arrangement = this.order(section_name =>{
+      return [section_name.play_len, this.sections[sections_name].stack]
+    })
+    console.log("arrangment", new_arrangment)
+    
+    
+  }
+}
+
+// Rockstar for song
+const rockstar_prog = await rockstar_pro`
+midnight is fading broken silence
+heart is beating heavy pressure
+echo is calling distant echoes
+shadow is holding shattered pieces
+
+Say shadow
+Say echo
+Say heart
+Say midnight
+
+fire is burning through the darkness
+memory is pulling fragile fragments
+dream is breaking under tension
+time is cutting open channels
+
+Say time
+Say dream
+Say memory
+Say fire
+
+echo is rising higher still
+echo is rising through the pain
+echo is rising past the damage
+echo is rising once again
+
+Say echo
+Say echo
+Say echo
+Say echo
+
+Put midnight into heart
+Put heart into fire
+Put heart into fire
+Put echo with fire into shadow
+
+Say echo
+Say heart
+Say heart
+Say midnight
+`
+
+var song = new Song(rockstar_prog)
 $ : arrange(song.arrangement)
 
 // $_: n(base(prog.output).slow(2)).scale(my_scale). s("supersaw").gain(1.5)
