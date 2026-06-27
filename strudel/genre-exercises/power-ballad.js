@@ -83,7 +83,7 @@ class Section {
       this._stack['piano'] =
       s(this.instruments['piano'])
       .n(this.tune)
-      .scale(start_scale)
+      //.scale(start_scale)
       .euclidLegato(this.rhythm.slow(2),8)
       .chord(this.chords[this.chord_type])
       .voicing()
@@ -95,11 +95,12 @@ class Section {
       this._stack['guitar'] =
       s(this.instruments['guitar'])
       .n(this.tune)
-      .scale(start_scale)
+      //.scale(start_scale)
       .euclidLegato(this.rhythm,8)
       .chord(this.chords[this.chord_type])
       .voicing()
       .transpose(this.transpose)
+      .gain(0.6)
       .color('orange')
     }
       if (this.instruments.hasOwnProperty('bass')){
@@ -108,8 +109,8 @@ class Section {
       .n(this.tune).sub("-16")
       .scale(start_scale)
       .euclidLegato(this.rhythm.slow(2).add('1'),8)
-      .chord(this.chords[this.chord_type])
-      .voicing()
+      // .chord(this.chords[this.chord_type])
+      //.voicing()
       .transpose(this.transpose)
       .color('yellow')
     }
@@ -132,6 +133,7 @@ class Section {
         .mask("0 1*3")
         .color('purple')
         )
+        // .room(0.8, 4)
       } 
       if(this.instruments.drums == 2){
       this._stack['drums'] = stack(
@@ -147,6 +149,7 @@ class Section {
         .euclid(this.drum_rhythm,8)
         .color('purple')
         )
+        // .room(0.8, 4)
       }
     }
   }
@@ -178,7 +181,7 @@ class Verse extends Section {
     this.play_len = 16
     this.advance_verse_lyrics = 8
     this.has_lyrics = true
-    // this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , 'drums': 2, 'bass':"gm_electric_bass_pick"}
+    this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , 'drums': 2, 'bass':"gm_electric_bass_pick"}
   }
 }
 
@@ -235,7 +238,7 @@ class Chorus2 extends Chorus {
 
 class Outro extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
-    super(base_scale, super_pattern)
+    super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
     this.play_len = 16
     this.tune_start = 10
@@ -282,7 +285,10 @@ class Song{
 
   addSection(name, class_obj){
     var new_section = new class_obj(this.start_scale, this.super_pattern, this.scale, this.chord_set)
-    const max_len = Math.min(this.prog.output, new_section.tune_start + new_section.src_len)
+    const max_len = Math.min(this.prog.output.length, new_section.tune_start + new_section.src_len)
+    // const max_len = new_section.tune_start + new_section.src_len)
+    
+    
     new_section.numbers = this.prog.output.slice(new_section.tune_start, max_len)
     if(new_section.has_lyrics){
       new_section.lyrics = this.prog.speech.slice(this.verse_lyrics_pos, this.verse_lyrics_pos + new_section.advance_verse_lyrics)
@@ -297,7 +303,7 @@ class Song{
       var section = this.sections[section_name]
       return [section.play_len, section.stack]
     })
-    new_arrangement.push([12, s("piano").n('~')])
+    new_arrangement.push([12, s("piano").n('~').gain(0)])
     console.log("arrangement", new_arrangement)
     return new_arrangement
   }
@@ -305,16 +311,6 @@ class Song{
 
 // Rockstar for song
 const rockstar_prog = await rockstar_pro`
-midnight is fading broken silence
-heart is beating heavy pressure
-echo is calling distant echoes
-shadow is holding shattered pieces
-
-Say shadow
-Say echo
-Say heart
-Say midnight
-
 fire is burning through the darkness
 memory is pulling fragile fragments
 dream is breaking under tension
@@ -324,6 +320,16 @@ Say time
 Say dream
 Say memory
 Say fire
+
+midnight is fading broken silence
+heart is beating heavy pressure
+echo is calling distant echoes
+shadow is holding shattered pieces
+
+Say shadow
+Say echo
+Say heart
+Say midnight
 
 echo is rising higher still
 echo is rising through the pain
@@ -349,10 +355,10 @@ Say midnight
 const A_minor_vi = ["<Am F C G>", "F C G Am"]  
 const C_major_I = ["<C G Am F>", "C G Am F"]
 const G_major_I = ["<G D Em C>", "C D Em F"]
-const start_scale = "g:major" //"a:minor"// "c:major"//, "g:major"
+const start_scale = "G:major" //"a:minor"// "c:major"//, "g:major"
 
 var song = new Song(rockstar_prog, "6 6 5 7", start_scale, G_major_I)
-$ : arrange(...song.arrangement).punchcard({'labels':'1'})
+$ : arrange(...song.arrangement).punchcard({'labels':'1'}).room(0.8, 4)
 
 
 // $_: n(base(prog.output).slow(2)).scale(my_scale). s("supersaw").gain(1.5)
