@@ -106,12 +106,12 @@ class Section {
       if (this.instruments.hasOwnProperty('bass')){
       this._stack['bass'] =
       s(this.instruments['bass'])
-      .n(this.tune).sub("-16")
+      .n(this.tune)
       .scale(start_scale)
       .euclidLegato(this.rhythm.slow(2).add('1'),8)
       // .chord(this.chords[this.chord_type])
       //.voicing()
-      .transpose(this.transpose)
+      .transpose(this.transpose-24)
       .color('yellow')
     }
  
@@ -123,9 +123,9 @@ class Section {
         .mask("1 0 1 0")
         .color('red'),
 
-        s("sn")
+        s("sd")
         .euclid(this.drum_rhythm,8)
-        .mask("1*3 0")
+        .mask("1*7 0")
         .color('pink'),
 
         s("hh")
@@ -141,8 +141,8 @@ class Section {
         .euclid(this.rhythm,8)
         .color('red'),
 
-        s("sn")
-        .euclid(this.drum_rhythm.add(3),8)
+        s("sd")
+        .euclid(this.drum_rhythm,8)
         .color('pink'),
 
         s("hh")
