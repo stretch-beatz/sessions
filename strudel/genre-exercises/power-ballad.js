@@ -96,12 +96,24 @@ class Section {
       s(this.instruments['guitar'])
       .n(this.tune)
       .scale(start_scale)
-      .euclidLegato(this.rhythm.slow(2),8)
+      .euclidLegato(this.rhythm,8)
       .chord(this.chords[this.chord_type])
       .voicing()
       .transpose(this.transpose)
       .color('orange')
     }
+      if (this.instruments.hasOwnProperty('bass')){
+      this._stack['bass'] =
+      s(this.instruments['bass'])
+      .n(this.tune).sub("-16")
+      .scale(start_scale)
+      .euclidLegato(this.rhythm.slow(2).add('1'),8)
+      .chord(this.chords[this.chord_type])
+      .voicing()
+      .transpose(this.transpose)
+      .color('yellow')
+    }
+ 
     if (this.instruments.hasOwnProperty('drums')){
       if(this.instruments.drums == 1){
       this._stack['drums'] = stack(
@@ -135,9 +147,7 @@ class Section {
         .euclid(this.drum_rhythm,8)
         .color('purple')
         )
-      } 
-      
-      
+      }
     }
   }
  
@@ -156,7 +166,7 @@ class Intro extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
-    this.play_len = 6
+    this.play_len = 8
     this.instruments = { 'strings': "gm_violin" }
   }
 }
@@ -165,10 +175,10 @@ class Verse extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     
-    this.play_len = 8
+    this.play_len = 16
     this.advance_verse_lyrics = 8
     this.has_lyrics = true
-    this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , 'drums': 2}
+    // this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , 'drums': 2, 'bass':"gm_electric_bass_pick"}
   }
 }
 
@@ -176,9 +186,9 @@ class PreChorus extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
-    this.play_len = 4
+    this.play_len = 8
     this.tune_start = 3
-    this.instruments = { 'strings': "gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 }
+    this.instruments = { 'strings': "gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 , 'bass':"gm_electric_bass_pick"}
   }
 }
 
@@ -186,10 +196,10 @@ class Chorus extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 4
-    this.play_len = 8
+    this.play_len = 16
     this.tune_start = 4
     this.has_lyrics = true
-    this.instruments = { 'strings': "gm_violin, gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 }
+    this.instruments = { 'strings': "gm_violin, gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 , 'bass':"gm_electric_bass_pick"}
     this.chord_type = 1
   }
 }
@@ -198,9 +208,9 @@ class GuitarSolo extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 3
-    this.play_len = 4
+    this.play_len = 16
     this.tune_start = 12
-    this.instruments = { 'guitar': "gm_overdriven_guitar", 'drums': 1 }
+    this.instruments = { 'guitar': "gm_overdriven_guitar", 'drums': 2 , 'bass':"gm_electric_bass_pick"}
     this.chord_type = 1
   }
 }
@@ -211,8 +221,15 @@ class Bridge extends Section {
     this.src_len = 2
     this.play_len = 4
     this.tune_start = 6
-    this.instruments = { 'strings': "gm_viola", 'piano': "gm_piano" , 'drums': 2}
+    this.instruments = { 'strings': "gm_viola" , 'drums': 2, 'bass':"gm_electric_bass_pick"}
     this.chord_type = 1
+  }
+}
+
+class Chorus2 extends Chorus {
+  constructor(base_scale, super_pattern, scale, chords) {
+    super(base_scale, super_pattern, scale, chords)
+    this.transpose = 0
   }
 }
 
@@ -220,11 +237,11 @@ class Outro extends Section {
   constructor(base_scale, super_pattern, scale, chords) {
     super(base_scale, super_pattern)
     this.src_len = 2
-    this.play_len = 12
+    this.play_len = 16
     this.tune_start = 10
-    this.instruments = { 'piano': "gm_piano", 'guitar': "gm_overdriven_guitar", 'drums': 2 }
+    this.instruments = { 'piano': "gm_piano", 'guitar': "gm_overdriven_guitar", 'drums': 2 , 'bass':"gm_electric_bass_pick"}
     this.chord_type = 1
-    this.transpose = 1
+    this.transpose = 0
   }
 }
 
@@ -233,7 +250,7 @@ class Outro extends Section {
 class Song{
   constructor(prog, super_pattern, start_scale, chord_set){
     
-    this.super_pattern = super_pattern || "5 5 6 8"
+    this.super_pattern = super_pattern || "5 5 6 7"
     this.sections = {}
     this.order = []
     this.tune_pos = 0
@@ -252,20 +269,21 @@ class Song{
     this.addSection('Verse3', Verse)
     this.addSection('GuitarSolo', GuitarSolo)
     this.addSection('Bridge', Bridge)
-    this.addSection('Chorus2',Chorus)
+    this.addSection('Chorus2',Chorus2)
     this.addSection('Outro', Outro)
     
     this.order = ['Intro', 'Verse1', 'PreChorus', 
       'Verse2', 'PreChorus', 'Chorus',
       'Verse3', 'PreChorus', 'Chorus',
-      'GuitarSolo', 'Bridge', 'Chorus2'
-                  //, 'Outro'
+      'GuitarSolo', 'Bridge',
+      'Chorus2', 'Outro'
       ]
   }
 
   addSection(name, class_obj){
     var new_section = new class_obj(this.start_scale, this.super_pattern, this.scale, this.chord_set)
-    new_section.numbers = this.prog.output.slice(new_section.tune_start, new_section.tune_start + new_section.src_len)
+    const max_len = Math.min(this.prog.output, new_section.tune_start + new_section.src_len)
+    new_section.numbers = this.prog.output.slice(new_section.tune_start, max_len)
     if(new_section.has_lyrics){
       new_section.lyrics = this.prog.speech.slice(this.verse_lyrics_pos, this.verse_lyrics_pos + new_section.advance_verse_lyrics)
       this.verse_lyrics_pos += new_section.advance_verse_lyrics
@@ -279,6 +297,7 @@ class Song{
       var section = this.sections[section_name]
       return [section.play_len, section.stack]
     })
+    new_arrangement.push([12, s("piano").n('~')])
     console.log("arrangement", new_arrangement)
     return new_arrangement
   }
@@ -332,8 +351,8 @@ const C_major_I = ["<C G Am F>", "C G Am F"]
 const G_major_I = ["<G D Em C>", "C D Em F"]
 const start_scale = "g:major" //"a:minor"// "c:major"//, "g:major"
 
-var song = new Song(rockstar_prog, "5 6 6 7", start_scale, G_major_I)
-$ : arrange(...song.arrangement).punchcard()
+var song = new Song(rockstar_prog, "6 6 5 7", start_scale, G_major_I)
+$ : arrange(...song.arrangement).punchcard({'labels':'1'})
 
 
 // $_: n(base(prog.output).slow(2)).scale(my_scale). s("supersaw").gain(1.5)
