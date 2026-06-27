@@ -45,6 +45,8 @@ class Section {
     this.transpose = 0
     this.tune_limit = "6"
     this.rhythm_limit = "5"
+    this.drum_limit = "8"
+    
     this.instruments = {}
     this._stack = null
     this.scale = scale
@@ -57,6 +59,7 @@ class Section {
     this._numbers = numbers
     this.tune = base(this.numbers, this.super_pattern.slow(this.play_len), this.tune_limit)
     this.rhythm = base(this.numbers, this.super_pattern.slow(this.play_len), this.rhythm_limit)
+    this.drum_rhythm = base(this.numbers, this.super_pattern.slow(this.play_len), this.drum_limit)
   }
 
   get numbers(){
@@ -100,23 +103,41 @@ class Section {
       .color('orange')
     }
     if (this.instruments.hasOwnProperty('drums')){
+      if(this.instruments.drums == 1){
       this._stack['drums'] = stack(
         s("bd")
-        .euclid(this.rhythm.slow(2),8)
+        .euclid(this.rhythm,8)
         .mask("1 0 1 0")
         .color('red'),
 
         s("sn")
-        .euclid(this.rhythm.slow(2),8)
+        .euclid(this.drum_rhythm,8)
         .mask("1*3 0")
         .color('pink'),
 
-        s(this.instruments['hh'])
-        .euclid(this.rhythm.slow(2),8)
+        s("hh")
+        .euclid(this.drum_rhythm,8)
         .mask("0 1*3")
         .color('purple')
         )
-        
+      } 
+      if(this.instruments.drums == 2){
+      this._stack['drums'] = stack(
+        s("bd")
+        .euclid(this.rhythm,8)
+        .color('red'),
+
+        s("sn")
+        .euclid(this.drum_rhythm.add(3),8)
+        .color('pink'),
+
+        s("hh")
+        .euclid(this.drum_rhythm,8)
+        .color('purple')
+        )
+      } 
+      
+      
     }
   }
  
@@ -144,7 +165,7 @@ class Verse extends Section {
     super(base_scale, super_pattern, scale, chords)
     this.advance_verse_lyrics = 8
     this.has_lyrics = true
-    this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , "drums": 2}
+    this.instruments = { 'strings': "gm_violin, gm_viola", 'piano': "gm_piano" , 'drums': 2}
   }
 }
 
@@ -153,7 +174,7 @@ class PreChorus extends Section {
     super(base_scale, super_pattern, scale, chords)
     this.src_len = 2
     this.tune_start = 3
-    this.instruments = { 'strings': "gm_viola", 'guitar': "gm_overdriven_guitar", "drums": 1 }
+    this.instruments = { 'strings': "gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 }
   }
 }
 
@@ -163,7 +184,7 @@ class Chorus extends Section {
     this.src_len = 4
     this.tune_start = 4
     this.has_lyrics = true
-    this.instruments = { 'strings': "gm_violin, gm_viola", 'guitar': "gm_overdriven_guitar", "drums": 1 }
+    this.instruments = { 'strings': "gm_violin, gm_viola", 'guitar': "gm_overdriven_guitar", 'drums': 1 }
     this.chord_type = 1
   }
 }
@@ -174,7 +195,7 @@ class GuitarSolo extends Section {
     this.src_len = 3
     this.play_len = 4
     this.tune_start = 12
-    this.instruments = { 'guitar': "gm_overdriven_guitar", "drums": 1 }
+    this.instruments = { 'guitar': "gm_overdriven_guitar", 'drums': 1 }
     this.chord_type = 1
   }
 }
@@ -185,7 +206,7 @@ class Bridge extends Section {
     this.src_len = 2
     this.play_len = 2
     this.tune_start = 6
-    this.instruments = { 'strings': "gm_viola", 'piano': "gm_piano" , "drums": 2}
+    this.instruments = { 'strings': "gm_viola", 'piano': "gm_piano" , 'drums': 2}
     this.chord_type = 1
   }
 }
@@ -196,7 +217,7 @@ class Outro extends Section {
     this.src_len = 2
     this.play_len = 4
     this.tune_start = 10
-    this.instruments = { 'piano': "gm_piano", 'guitar': "gm_overdriven_guitar" }
+    this.instruments = { 'piano': "gm_piano", 'guitar': "gm_overdriven_guitar", 'drums': 2 }
     this.chord_type = 1
     this.transpose = 1
   }
