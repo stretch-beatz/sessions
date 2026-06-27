@@ -3,6 +3,7 @@ const { init, rockstar_pro } = await import('https://esm.sh/rockstar-strudel')
 // Pre-warm the WASM engine while other code loads (optional but recommended)
 await init()
 
+
 /*
 80s power ballads
     Intro > Verse > Pre-Chorus > Verse > Pre-Chorus > Chorus > Guitar Solo > Bridge > Final Chorus (Key Change) > Outro.
@@ -65,8 +66,6 @@ const keyChange = "0*4 2*2".slow(16)
 
 // Constant emotional escalation
 
-
-
 class Section {
   src_len = 4
   play_len = 4
@@ -84,8 +83,9 @@ class Section {
   #stack = null
   scale = null
   
-  constructor(base_scale) {
+  constructor(base_scale, super_pattern) {
     this.scale = base_scale
+    this.super_pattern = super_pattern
   }
 
   set numbers(numbers){
@@ -132,6 +132,8 @@ class Section {
     return stack(Object.values(this.#stack))
   }
 }
+
+/*
 
 //Intro > Verse > Pre-Chorus > Verse > Pre-Chorus > Chorus > Guitar Solo > Bridge > Final Chorus (Key Change) > Outro.
 class Intro extends Section {
@@ -194,9 +196,10 @@ class Song{
   chord_set = A_minor_vi
   prog = null
   
-  constructor(prog){
+  constructor(prog, super_pattern){
     console.log('Song{')
     this.prog = prog
+    this.super_pattern = super_pattern
 
     this.addSection('Intro', Intro)
     this.addSection('Verse1', Verse)
@@ -219,7 +222,7 @@ class Song{
   addSection(name, class_obj){
     console.log('addSection(',name, class_obj)
     console.log('class_obj', class_obj)
-    var new_section = new class_obj(this.start_scale)
+    var new_section = new class_obj(this.start_scale, this.super_pattern)
     new_section.numbers = this.prog.output.slice(this.tune_start , this.tune_start + this.src_len)
     if(new_section.has_lyrics){
       new_section.lyrics = this.prog.speech.slice(this.lyrics_pos , this.lyrics_pos + this_src.len)
@@ -284,6 +287,7 @@ Say midnight
 
 var song = new Song(rockstar_prog)
 $ : arrange(song.arrangement)
+*/
 
 // $_: n(base(prog.output).slow(2)).scale(my_scale). s("supersaw").gain(1.5)
 // samples('shabda/phonemes/en-GB/m:'+prog.speech.join(',')+'?force=0&overrides=papa:P_AA1_P_A')
