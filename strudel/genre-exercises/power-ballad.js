@@ -351,13 +351,13 @@ Say heart
 Say heart
 Say midnight
 `
+const start_scale = "g:major" //"a:minor"// "c:major"//, "g:major"
 
-const A_minor_vi = ["<Am F C G>", "F C G Am"]  
-const C_major_I = ["<C G Am F>", "C G Am F"]
-const G_major_I = ["<G D Em C>", "C D Em F"]
-const start_scale = "G:major" //"a:minor"// "c:major"//, "g:major"
+// const chords = ["<Am F C G>", "F C G Am"] // A_minor_vi  
+// const chords = ["<C G Am F>", "C G Am F"] // C_major_I
+const chords = ["<G D Em C>", "C D Em F"]
 
-var song = new Song(rockstar_prog, "6 6 5 7", start_scale, G_major_I)
+var song = new Song(rockstar_prog, "6 6 5 7", start_scale, chords)
 $ : arrange(...song.arrangement).punchcard({'labels':'1'}).room(0.8, 4)
 
 
