@@ -25,7 +25,7 @@ $: stack (
 
    //Ghost Notes / Rims: Fill in the blank spaces with ghost notes, soft rim shots, or side-sticks in the 16th-note positions. This creates a call-and-response feel and defines the "skippy" garage sound.
   s("[- - - rim]*4 ").n(0).gain(0.7)//.swing(4)
-)
+)//.rib(1,5/4)
 /*3. The Secret Ingredient: Swing
 UKG relies entirely on swing to get its signature shuffle.Program your drums straight onto the grid, and then apply swing (e.g., MPC 16th-note swing settings like 64 or 68) to push the offbeat notes slightly later in time.
 */
@@ -39,7 +39,7 @@ $: s("etv_gm_136_phrase").n("<0 1 2 3 - 4 5 - - 6  - 7 - 8>"// - 3 0 0 3>"
   ).speed((4/3))//*(124/136))
 
 // Define a bouncy 4-bar UKG/Bassline pattern
-/*$_:  note("d2 [~ d3] ~ d2 | ~ [d2 d3] ~ d2 | f2 [~ f3] ~ f2 | ~ [g2 g3] ~ g2")
+$:  note("d2 [~ d3] ~ d2 | ~ [d2 d3] ~ d2 | f2 [~ f3] ~ f2 | ~ [g2 g3] ~ g2")
     .s("sawtooth") // Aggressive harmonic base
   .detune("6")            // Adds movement and width
   .sustain("2")
@@ -48,7 +48,7 @@ $: s("etv_gm_136_phrase").n("<0 1 2 3 - 4 5 - - 6  - 7 - 8>"// - 3 0 0 3>"
   .resonance(12)      // Sharpens the filter edge for a wetter "wub"
   .distort(0.2)       // Gritty British club finish
   .gain("3")
-*/
+
 var bassline = n("0 [~ 7] ~ 0 | ~ [0 7] ~ 0 | 2 [~ 9] ~ 2 | ~ [4 11] ~ 4")
         // Enforces G Major across all degree inputs
 $_: stack(
@@ -66,7 +66,7 @@ $_: stack(
 
 
 // The Sheffield Bouncing Rhythm in G Major
-$: note("0 [~ 7] ~ 0 | ~ [0 7] ~ 0")
+// $: note("0 [~ 7] ~ 0 | ~ [0 7] ~ 0")
   .scale("G:major")
   
   // 1. The Core Tone: A hollow square wave instead of a saw
