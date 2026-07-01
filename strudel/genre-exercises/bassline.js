@@ -51,7 +51,7 @@ var basslines = [
   .distort(0.2)       // Gritty British club finish
   .gain("3")
 ,
-
+ stack(
   bassline.s("sawtooth").scale("G2:major"),     // Pure raw sawtooth foundation
   bassline.s("square").scale("G1:major").gain(0.75)
   .sustain(0.35)
@@ -62,12 +62,14 @@ var basslines = [
     .detune(55)            // Massive phase movement and width
     .distort(0.7)          // Hard clipped British club grit
     .hpf(42)
+  )
 ,
 
   // The Sheffield Bouncing Rhythm in G Major
   // $: note("0 [~ 7] ~ 0 | ~ [0 7] ~ 0")
+ stack(
   bassline
-    .scale("G:major")
+    .scale("G2:major")
     .sound("square")
     .sustain(0.12) 
     .lpf(400) 
@@ -82,8 +84,10 @@ var basslines = [
     .lpf(sine.fast(4).range(180, 2600))
     .lpq(16)
     .distort(0.65)
+    )
 ,
-  n("0").scale("G2:major")
+ stack(
+   n("0").scale("G2:major")
     .s("sine")
     .gain(0.28)
     .lpf(140)
@@ -97,6 +101,7 @@ var basslines = [
     .lpf(sine.fast(6).range(160, 3200))
     .lpq(18)
     .distort(0.68)
+   )
   ]
 
 $: basslines[1 % basslines.length]
