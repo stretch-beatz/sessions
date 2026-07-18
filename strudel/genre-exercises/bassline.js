@@ -1,4 +1,5 @@
-// Bassline
+//@title Bassline - Genre Exercise
+//@by stretchyboy
 
 // 135-142 bpm
 setcpm(136/4)
