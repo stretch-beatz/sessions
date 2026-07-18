@@ -1,3 +1,6 @@
+//@title  Power Ballad -  Genre Exercise
+//@by stretchyboy
+
 const { init, rockstar_pro } = await import('https://esm.sh/rockstar-strudel')
 
 // Pre-warm the WASM engine while other code loads (optional but recommended)
