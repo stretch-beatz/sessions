@@ -1,4 +1,4 @@
-//@title Sept Gig Prep
+//@title Sept Gig
 //@by stretch___beatz
 
 // Visuals by SUTC OLP students
@@ -19,23 +19,27 @@ var scaleSelect = cc(28).range(0,1)
 var bassScale = chooseWith(scaleSelect, ["g1:minor", "c1:minor", "c1:major"])
 var leadScale = chooseWith(scaleSelect, ["g3:minor", "c3:minor", "c3:major"])
 var scaleVocal = chooseWith(scaleSelect, ["etv_gm_136_phrase", "etv_cm_136_phrase", "~"])
-var drumBank = chooseWith(cc(48), ["linn", "bossdr110", "bossdr220","tr909"])
+var drumBank = chooseWith(cc(47), ["linn", "bossdr110", "bossdr220","tr909"])
 
-// /*
+
+// Hi I'm stretch___beatz
+
+/*
 /////////////////////////////////////////////
 // 1 Bassline
 var gabba_main_drum
 var main_drum = stack(
+  // s("bd*4"),
   s("bd - - - bd [- -  bd bd] - -").n(1).slow(2),  
-  // s("[- sd]*2").n(2)
-    // .every(4, rev)
+  s("[- sd]*2").n(2)
+    .every(4, rev)
   ).jux(rev)
   
 var bl_drums = stack (
   main_drum,
-  // s("[- hh]*4").n(1),
-  // s("[[- - - oh] -]*2").n(1),
-  // s("[- - - rim]*4 ").n(0).gain(0.7)
+  s("[- hh]*4").n(1),
+  s("[[- - - oh] -]*2").n(1),
+  s("[- - - rim]*4 ").n(0).gain(0.7)
 )
 .color("grey")
 
@@ -46,9 +50,9 @@ var bl_vocals =  s(scaleVocal) //keys[key].bl_vocals)
   .speed((4/3))
 .color("yellow")
 
-var bl_bassline = n("0 [~ 7] ~ 0 | ~ [0 7] ~ 0 | 2 [~ 9] ~ 2 | ~ [4 11] ~ 4")
-// var bl_bassline = n("0 [~ 0] ~ 0 | ~ [0 0] ~ 0 | 0 [~ 0] ~ 0 | ~ [0 0] ~ 0"
-// .add(note(baseMidin(base, cc, 21, 5, 16))))
+// var bl_bassline = n("0 [~ 7] ~ 0 | ~ [0 7] ~ 0 | 2 [~ 9] ~ 2 | ~ [4 11] ~ 4")
+var bl_bassline = n("0 [~ 0] ~ 0 | ~ [0 0] ~ 0 | 0 [~ 0] ~ 0 | ~ [0 0] ~ 0"
+.add(note(baseMidin(base, cc, 21, 5, 16))))
 // var bl_bassline = note(baseMidin(base, cc, 21, 5, 16))  
   // .euclid(cc(41).range(1, 16).round(), 16).slow(2)
 
@@ -99,10 +103,10 @@ var basslines = arrange(
   )
 var bassline_track =stack(
   bl_drums,
-  // basslines,
-  // bl_vocals,
+  basslines.gain(1.3),
+  bl_vocals.gain(1),
 )
-// */
+*/
 // /*
 /////////////////////////////////////
 // 2 Gabba
@@ -116,10 +120,11 @@ var gabba_drum = stack(
   gabba_main_drum,
   s("hh")
     .euclid(
-      "<5>"
-      // cc(21).range("<5>",16).round()
+      // "<5>"
+      cc(21).range("<5 4>",16).round()
       ,16)
     .slow(2)
+  .gain(1.2)
   ).color("blue")
 
 var gabba_gabba = note(
@@ -128,7 +133,7 @@ var gabba_gabba = note(
   )
   .scale(bassScale)
   .struct(gabba_drum)
-  // .euclidLegato(cc(42).range("<4>",16).round(),16).slow(2)
+  .euclidLegato(cc(42).range("<4>",16).round(),16).slow(2)
   // .clip(0.5)
   .s("gabba")
   .color("orange")
@@ -146,18 +151,18 @@ var pads = s("<pads>")
 
 var gabba_track =  stack(
   gabba_drum, 
-  // gabba_gabba,
+  gabba_gabba,
   // pads
 )
 // */
-setcpm(136/4) // setcpm(172/4)
-$: xfade(bassline_track, cc(48), gabba_track).pianoroll()
+setcpm(140/4) // setcpm(172/4)
+// $: xfade(bassline_track, cc(48), gabba_track).pianoroll()
 
 
 //////////////////////////////////////////////
 
 
-/*
+// /*
 // 3 SPACE
 const { Observer, Equator, GeoVector, MoonPhase, KM_PER_AU } = await import('https://esm.run/astronomy-engine@2.1.19');
 const observer = new Observer(53.38, -1.46, 0); // SHEFFIELD
@@ -170,8 +175,8 @@ const marsDist = round(mars.dist * KM_PER_AU)
 const sun = Equator('Sun', date, observer, true, true);
 const sunDist = round(sun.dist * KM_PER_AU)
 
-const moonEuclidPattern = "<4 5@2 7>"
-const sunEuclidPattern = "<5*3 6@3 7>" 
+const moonEuclidPattern = "<6 5@2 3>"
+const sunEuclidPattern = "<5*3 5@3 7>" 
 var space_track =  stack(
   s("clubkick*4").color("blue"),
   stack( //space drums
@@ -201,14 +206,14 @@ var space_track =  stack(
 
 
 // $: xfade(space_track, cc(48), gabba_track).pianoroll()
-// */
+
 ///////////////////////////////////////////////////////////////////
-/*
+// /*
 var knob_twiddler = stack(
     s("bd")
     .gain(2)
     .bank(drumBank)
-    .euclid(base(cc(21).range("<1 2>","<5 7>").round()),8)
+    .euclid(base(cc(21).range("<1@3 2>","<5 6@2 7>").round()),8)
     .color("blue"),
  
   s("hh")
@@ -217,17 +222,17 @@ var knob_twiddler = stack(
 
   s("sd")// oh")
     .bank(drumBank)
-    .euclid(base(cc(22).range("<1@3 4>","<5 6>").round()),16)
+    .euclid(base(cc(22).range("<1@4 4>","<7 6>").round()),16)
   .sometimes(rev),
   
   
   s("oh")
     .bank(drumBank)
-    .euclid(base(cc(42).range("<1 3>","<5 7@3>").round()),8),
+    .euclid(base(cc(42).range("<1 3 0>","<3 3 7@3>").round()),8),
 
   note(baseMidin(base, cc, 24, 6, 7).slow(2))
     .scale(bassScale)
-    .euclidLegato(cc(23).range("<1@5 3*3>", "<13@3 8>").round(), 8)
+    .euclidLegato(cc(23).range("<1@5 0*3>", "<7@3 8>").round(), 8)
   .sometimes(x=>x.slow(2))
   .o(3)
     .sound(chooseWith(cc(43), [
@@ -239,19 +244,20 @@ var knob_twiddler = stack(
     .gain(2)//cc(44).range(1,4))
     .color("orange"),
   
-    note(baseMidin(base, cc, 26, 9, 7))
+    note(baseMidin(base, cc, 26, 7, 7))
     .scale(leadScale)
     .euclidLegato(cc(25).range(1, 16).round(), 16)
     .sound(chooseWith(cc(45), [
-      // "sawtooth", "bytebeat",
+      "sawtooth", "bytebeat",
       "balafon"]))
      .acidenv(cc(46))
     // .gain(cc(46).range(1,4))
     .color("green")
   )
+setcpm(162/4) // setcpm(172/4)
 
 $: xfade(space_track, cc(48), knob_twiddler).pianoroll()
 
-*/
+// */
 
 
