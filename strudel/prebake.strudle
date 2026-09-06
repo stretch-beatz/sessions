@@ -1,5 +1,7 @@
+//borrowed from switch angel
 register('acidenv', (x, pat)=> pat.lpf(100).lpenv(x*9).lps(.2).lpd(9.12))
 
+//mix hydra sources together
 window.smoothMix = (sources, speed = 0.1) => {
   let result = src(sources[0])
 
@@ -11,20 +13,18 @@ window.smoothMix = (sources, speed = 0.1) => {
           time * speed +
           i * (Math.PI * 2 / sources.length)
         ) + 1
-      ) / 2
-      
+      ) / 2      
     )
   }
-
   return result
 }
 
-
+//Need to add this to strudel
 window.baseMidin = (b, c, m, n, i) =>
   b(c(m).range(0, (n**i)-1).round(), n, i)
 
+// Base Class for Canvas visulaisers
 class CachedCanvasVisualiser {
-
   constructor(width, height) {
 
     this.canvas = document.createElement('canvas')
@@ -52,6 +52,7 @@ class CachedCanvasVisualiser {
 
 }
 
+// Shows Midi based around the layout of my Novation  Launch Control
 class MidiVisualiser extends CachedCanvasVisualiser {
 
   constructor({
@@ -215,7 +216,7 @@ class MidiVisualiser extends CachedCanvasVisualiser {
 
 }
 
-
+// Space visualiser for my space based music
 class SpaceVisualiser extends CachedCanvasVisualiser {
 
   constructor({

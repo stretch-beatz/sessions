@@ -72,5 +72,10 @@ spaceVis.start()
 // hydra code
 s1.init({src: midiVis.canvas})
 s2.init({src: spaceVis.canvas})
-smoothMix([s0,s1,s2]).out(o0)
+smoothMix([s0,s1,s2])
+  .modulateRotate(shape(999,0.3,0.5),H(cc(22).mul(Math.PI)))
+  .scrollY(
+    ()=> a.fft[0]*(cc(42).firstCycleValues?.[0] ?? 0)
+  )
+  .out(o0)
 
