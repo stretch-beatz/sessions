@@ -510,3 +510,119 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
 
 window.MidiVisualiser = MidiVisualiser
 window.SpaceVisualiser = SpaceVisualiser
+
+
+// track structure stuff
+
+window.createTrack = () => ({});
+
+window.stemColorPalettes = {
+  reds: { drums: "Crimson", bass: "DarkRed", lead: "Tomato", vocals: "LightCoral" },
+  greens: { drums: "DarkGreen", bass: "ForestGreen", lead: "MediumSeaGreen", vocals: "PaleGreen" },
+  blues: { drums: "MidnightBlue", bass: "Navy", lead: "RoyalBlue", vocals: "SkyBlue" },
+  yellowsOranges: { drums: "SaddleBrown", bass: "DarkOrange", lead: "Gold", vocals: "Khaki" },
+  pinksPurples: { drums: "Indigo", bass: "Purple", lead: "DeepPink", vocals: "Plum" },
+  graysNeutrals: { drums: "Black", bass: "DimGray", lead: "SlateGray", vocals: "Gainsboro" }
+};
+
+
+var faderTypes = {
+  cross:{
+    left: {
+      vocals: [1, 0, 0, 0, 0],
+      lead:   [1, 1, 0, 0, 0],
+      bass:   [1, 1, 1, 0, 0],
+      drums:  [1, 1, 1, 1, 0]
+    },
+    right: {
+      drums:  [0, 1, 1, 1, 1],
+      bass:   [0, 0, 1, 1, 1],
+      lead:   [0, 0, 0, 1, 1],
+      vocals: [0, 0, 0, 0, 1]
+    }
+  },
+  out_in: {
+    left: {
+      vocals:  [1, 0, 0, 0, 0, 0, 0, 0, 0], 
+      lead:    [1, 1, 0, 0, 0, 0, 0, 0, 0], 
+      bass:    [1, 1, 1, 0, 0, 0, 0, 0, 0], 
+      drums:   [1, 1, 1, 1, 0.5, 0, 0, 0, 0],
+    },
+    right:{
+      drums:  [0, 0, 0, 0, 0.5, 1, 1, 1, 1],
+      bass:   [0, 0, 0, 0, 0, 0, 1, 1, 1], 
+      lead:   [0, 0, 0, 0, 0, 0, 0, 1, 1], 
+      vocals: [0, 0, 0, 0, 0, 0, 0, 0, 1]  
+    }
+  }
+};
+
+
+// Choose fader type 
+// cross (the new drum come in when the vocal drop out)
+// or out_in that cuts each intrument out before mixing the drum and putting the other side in
+// var faderGains = faderTypes.cross;
+var faderGains = faderTypes.out_in;
+window.faderMax = faderGains.left.drums.length - 1
+
+const compileTrackWithGain = (trackObj, faderIndex, side) => {
+  const coreKeys = ['drums', 'bass', 'lead', 'vocals'];
+  const compiledLayers = [];
+
+    // Determine the active theme palette for this track (fallback to neutrals)
+  const activePalette = trackObj.colorFamily && stemColorPalettes[trackObj.colorFamily] 
+    ? stemColorPalettes[trackObj.colorFamily] 
+    : stemColorPalettes.graysNeutrals;
+  
+  // Loop over Core Stems and apply native Masking
+  coreKeys.forEach(stem => {
+    const rawPattern = trackObj[stem] || silence;
+    const stepsArray = faderGains[side][stem];
+
+     // Identify the target color string from our palette map
+    const assignedColor = activePalette[stem];
+    
+    // Pick the step signal based on the fader index
+    const liveMaskSignal = pick(faderIndex, stepsArray);
+
+    // When liveMaskSignal is 0, the visualizer clears and the CPU stops calculating the track events.
+    const optimizedPattern = rawPattern
+      .color(assignedColor)
+      .gain(liveMaskSignal)
+      .mask(liveMaskSignal);
+    
+    compiledLayers.push(optimizedPattern);
+  });
+
+  // Loop over Dynamic Stems (Always active on selected deck)
+  Object.keys(trackObj).forEach(key => {
+    if (!coreKeys.includes(key)) {
+      compiledLayers.push(trackObj[key]);
+    }
+  });
+
+  return stack(...compiledLayers);
+};
+
+window.compileTrackWithGain = compileTrackWithGain
+
+
+function toSides(sections, faderIndex) {
+  const names = Object.keys(sections);
+  const left = [];
+  const right = [];
+
+  for (let i = 0; i < names.length - 1; i++) {
+    if (i % 2 === 0) {
+      left.push(compileTrackWithGain(sections[names[i]], faderIndex, 'left'));
+      right.push(compileTrackWithGain(sections[names[i + 1]], faderIndex, 'right'));
+    } else {
+      left.push(compileTrackWithGain(sections[names[i + 1]], faderIndex, 'left'));
+      right.push(compileTrackWithGain(sections[names[i]], faderIndex, 'right'));
+    }
+  }
+  return { left, right };
+}
+window.toSides = toSides
+
+
