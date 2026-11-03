@@ -1,6 +1,19 @@
 //borrowed from switch angel
 register('acidenv', (x, pat)=> pat.lpf(100).lpenv(x*9).lps(.2).lpd(9.12))
 
+
+// https://gist.github.com/walfie/b049d32368cb579a5980d4fb49d416ba
+const romanChordMapping = { i: 0, ii: 1, iii: 2, iv: 3, v: 4, vi: 5, vii: 6 }
+register('romanChord', function (scaleName, pat) {
+  return pat.as("roman:chordSuffix").fmap(({ roman, chordSuffix}) => {
+    const lower = roman.toLowerCase();
+    return n(romanChordMapping[lower]).scale(scaleName).fmap(value => {
+      return value.note.slice(0, -1) + (roman == lower ? 'm' : '') + (chordSuffix || '');
+    }).chord();
+  }).outerJoin();
+});
+
+
 //mix hydra sources together
 window.smoothMix = (sources, speed = 0.1) => {
   let result = src(sources[0])
@@ -624,5 +637,4 @@ function toSides(sections, faderIndex) {
   return { left, right };
 }
 window.toSides = toSides
-
 
