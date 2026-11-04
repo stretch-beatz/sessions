@@ -1,640 +1,95 @@
-//borrowed from switch angel
-register('acidenv', (x, pat)=> pat.lpf(100).lpenv(x*9).lps(.2).lpd(9.12))
-
-
-// https://gist.github.com/walfie/b049d32368cb579a5980d4fb49d416ba
-const romanChordMapping = { i: 0, ii: 1, iii: 2, iv: 3, v: 4, vi: 5, vii: 6 }
-register('romanChord', function (scaleName, pat) {
-  return pat.as("roman:chordSuffix").fmap(({ roman, chordSuffix}) => {
-    const lower = roman.toLowerCase();
-    return n(romanChordMapping[lower]).scale(scaleName).fmap(value => {
-      return value.note.slice(0, -1) + (roman == lower ? 'm' : '') + (chordSuffix || '');
-    }).chord();
-  }).outerJoin();
-});
-
-
-//mix hydra sources together
-window.smoothMix = (sources, speed = 0.1) => {
-  let result = src(sources[0])
-
-  for (let i = 1; i < sources.length; i++) {
-    result = result.blend(
-      src(sources[i]),
-      () => (
-        Math.sin(
-          time * speed +
-          i * (Math.PI * 2 / sources.length)
-        ) + 1
-      ) / 2      
-    )
-  }
-  return result
-}
-
-//Need to add this to strudel
-window.baseMidin = (b, c, m, n, i) =>
-  b(c(m).range(0, (n**i)-1).round(), n, i)
-
-// Base Class for Canvas visulaisers
-class CachedCanvasVisualiser {
-  constructor(width, height) {
-
-    this.canvas = document.createElement('canvas')
-    this.canvas.width = width
-    this.canvas.height = height
-
-    this.ctx = this.canvas.getContext('2d')
-
-    this.staticCanvas = document.createElement('canvas')
-    this.staticCanvas.width = width
-    this.staticCanvas.height = height
-
-    this.staticCtx = this.staticCanvas.getContext('2d')
-
-    this.running = false
-  }
-
-  start() {
-    this.running = true
-  }
-
-  stop() {
-    this.running = false
-  }
-
-}
-
-// Shows Midi based around the layout of my Novation  Launch Control
-class MidiVisualiser extends CachedCanvasVisualiser {
-
-  constructor({
-    cc,
-    width = 700,
-    height = 600,
-    refreshMs = 500
-  }) {
-
-    super(width, height)
-
-    this.cc = cc
-    this.refreshMs = refreshMs
-
-    this.topRow = [21,22,23,24,25,26,27,28]
-    this.bottomRow = [41,42,43,44,45,46,47,48]
-
-    this.lastDrawTime = 0
-
-    this.cachedValues = new Map()
-
-    this.buildStaticLayer()
-  }
-
-  buildStaticLayer() {
-
-    const ctx = this.staticCtx
-
-    ctx.fillStyle = 'black'
-    ctx.fillRect(0,0,this.width,this.height)
-
-    const drawTrack = (ccNum,col,row) => {
-
-      const x = 40 + col * 80
-      const yOffset = row * 270
-
-      ctx.fillStyle = '#222'
-      ctx.fillRect(
-        x,
-        60 + yOffset,
-        50,
-        200
-      )
-
-      ctx.fillStyle = 'white'
-      ctx.font = '16px monospace'
-      ctx.fillText(
-        ccNum,
-        x + 12,
-        285 + yOffset
-      )
-    }
-
-    this.topRow.forEach((n,i)=>
-      drawTrack(n,i,0))
-
-    this.bottomRow.forEach((n,i)=>
-      drawTrack(n,i,1))
-  }
-
-  getCCValue(n) {
-
-    const value =
-      this.cc(n).firstCycleValues?.[0] ?? 0
-
-    const previous =
-      this.cachedValues.get(n)
-
-    if (previous === value) {
-      return {
-        changed:false,
-        value
-      }
-    }
-
-    this.cachedValues.set(n,value)
-
-    return {
-      changed:true,
-      value
-    }
-  }
-
-  drawMeter(n,col,row,color) {
-
-    const { value } =
-      this.getCCValue(n)
-
-    const x = 40 + col * 80
-    const yOffset = row * 270
-    const h = value * 200
-
-    this.ctx.fillStyle = color
-
-    this.ctx.fillRect(
-      x,
-      260 + yOffset - h,
-      50,
-      h
-    )
-
-    this.ctx.fillStyle = 'white'
-    this.ctx.font = '16px monospace'
-
-    this.ctx.fillText(
-      value.toFixed(2),
-      x - 2,
-      50 + yOffset
-    )
-  }
-
-  render() {
-
-    this.ctx.drawImage(
-      this.staticCanvas,
-      0,
-      0
-    )
-
-    this.topRow.forEach((n,i)=>
-      this.drawMeter(
-        n,
-        i,
-        0,
-        '#ff9900'
-      )
-    )
-
-    this.bottomRow.forEach((n,i)=>
-      this.drawMeter(
-        n,
-        i,
-        1,
-        '#00ff66'
-      )
-    )
-  }
-
-  start() {
-
-    super.start()
-
-    const loop = (timestamp)=>{
-
-      if (!this.running) return
-
-      requestAnimationFrame(loop)
-
-      if (
-        timestamp - this.lastDrawTime <
-        this.refreshMs
-      ) return
-
-      this.lastDrawTime = timestamp
-
-      this.render()
-    }
-
-    requestAnimationFrame(loop)
-  }
-
-}
-
-// Space visualiser for my space based music
-class SpaceVisualiser extends CachedCanvasVisualiser {
-
-  constructor({
-    observer,
-    Equator,
-    KM_PER_AU,
-    width = 700,
-    height = 700,
-    refreshMs = 60000
-  }) {
-
-    super(width,height)
-
-    this.observer = observer
-    this.Equator = Equator
-    this.KM_PER_AU = KM_PER_AU
-
-    this.refreshMs = refreshMs
-    this.lastUpdate = 0
-
-    this.planets = []
-
-    this.zodiac = [
-      '♈','♉','♊','♋',
-      '♌','♍','♎','♏',
-      '♐','♑','♒','♓'
-    ]
-
-    this.zodiacNames = [
-      'Aries','Taurus',
-      'Gemini','Cancer',
-      'Leo','Virgo',
-      'Libra','Scorpio',
-      'Sagittarius',
-      'Capricorn',
-      'Aquarius',
-      'Pisces'
-    ]
-
-    this.buildStaticLayer()
-  }
-
-  buildStaticLayer() {
-
-    const ctx = this.staticCtx
-
-    const cx = 350
-    const cy = 300
-
-    const outerR = 260
-    const innerR = 220
-
-    ctx.fillStyle = 'black'
-    ctx.fillRect(
-      0,
-      0,
-      this.canvas.width,
-      this.canvas.height
-    )
-
-    ctx.strokeStyle = '#666'
-    ctx.lineWidth = 2
-
-    ctx.beginPath()
-    ctx.arc(
-      cx,
-      cy,
-      outerR,
-      0,
-      Math.PI * 2
-    )
-    ctx.stroke()
-
-    ctx.beginPath()
-    ctx.arc(
-      cx,
-      cy,
-      innerR,
-      0,
-      Math.PI * 2
-    )
-    ctx.stroke()
-
-    for(let i=0;i<12;i++){
-
-      const angle =
-        (i/12)*Math.PI*2 -
-        Math.PI/2
-
-      const x1 =
-        cx + Math.cos(angle)*innerR
-
-      const y1 =
-        cy + Math.sin(angle)*innerR
-
-      const x2 =
-        cx + Math.cos(angle)*outerR
-
-      const y2 =
-        cy + Math.sin(angle)*outerR
-
-      ctx.beginPath()
-      ctx.moveTo(x1,y1)
-      ctx.lineTo(x2,y2)
-      ctx.stroke()
-
-      const tx =
-        cx + Math.cos(
-          angle + Math.PI/12
-        ) * 240
-
-      const ty =
-        cy + Math.sin(
-          angle + Math.PI/12
-        ) * 240
-
-      ctx.fillStyle = '#aaa'
-
-      ctx.font = '24px serif'
-      ctx.fillText(
-        this.zodiac[i],
-        tx - 10,
-        ty + 10
-      )
-
-      ctx.font = '12px monospace'
-      ctx.fillText(
-        this.zodiacNames[i],
-        tx - 25,
-        ty + 35
-      )
-    }
-  }
-
-  updatePlanetData() {
-
-    const date = new Date()
-
-    const moon =
-      this.Equator(
-        'Moon',
-        date,
-        this.observer,
-        true,
-        true
-      )
-
-    const mars =
-      this.Equator(
-        'Mars',
-        date,
-        this.observer,
-        true,
-        true
-      )
-
-    const sun =
-      this.Equator(
-        'Sun',
-        date,
-        this.observer,
-        true,
-        true
-      )
-
-    this.planets = [
-      {
-        label:
-          '☉ '+
-            Math.round(
-              sun.dist *
-              this.KM_PER_AU
-            )
-          +'km',
-        ra:sun.ra,
-        colour:'#ffcc00'
-      },
-      {
-        label:
-          '☽ '+
-            Math.round(
-              moon.dist *
-              this.KM_PER_AU
-              )
-            +'km',
-        ra:moon.ra,
-        colour:'#ffffff'
-      },
-      {
-        label:
-          '♂ '+
-            Math.round(
-              mars.dist *
-              this.KM_PER_AU
-            )
-          +'km',
-        ra:mars.ra,
-        colour:'#ff6666'
-      }
-    ]
-  }
-
-  drawPlanet(planet) {
-
-    const cx = 350
-    const cy = 300
-    const orbit = 220
-
-    const angle =
-      (planet.ra / 24) *
-      Math.PI * 2 -
-      Math.PI / 2
-
-    const x =
-      cx +
-      Math.cos(angle) * orbit
-
-    const y =
-      cy +
-      Math.sin(angle) * orbit
-
-    this.ctx.fillStyle =
-      planet.colour
-
-    this.ctx.beginPath()
-
-    this.ctx.arc(
-      x,
-      y,
-      10,
-      0,
-      Math.PI * 2
-    )
-
-    this.ctx.fill()
-
-    this.ctx.fillStyle='white'
-
-    this.ctx.fillText(
-      planet.label,
-      x + 15,
-      y
-    )
-  }
-
-  render() {
-
-    this.ctx.drawImage(
-      this.staticCanvas,
-      0,
-      0
-    )
-
-    this.planets.forEach(
-      planet => this.drawPlanet(planet)
-    )
-  }
-
-  start() {
-
-    super.start()
-
-    this.updatePlanetData()
-    this.render()
-
-    const loop = ()=>{
-
-      if (!this.running) return
-
-      requestAnimationFrame(loop)
-
-      const now = Date.now()
-
-      if (
-        now - this.lastUpdate <
-        this.refreshMs
-      ){
-        return
-      }
-
-      this.lastUpdate = now
-
-      this.updatePlanetData()
-      this.render()
-    }
-
-    requestAnimationFrame(loop)
-  }
-
-}
-
-window.MidiVisualiser = MidiVisualiser
-window.SpaceVisualiser = SpaceVisualiser
-
-
-// track structure stuff
-
-window.createTrack = () => ({});
-
-window.stemColorPalettes = {
-  reds: { drums: "Crimson", bass: "DarkRed", lead: "Tomato", vocals: "LightCoral" },
-  greens: { drums: "DarkGreen", bass: "ForestGreen", lead: "MediumSeaGreen", vocals: "PaleGreen" },
-  blues: { drums: "MidnightBlue", bass: "Navy", lead: "RoyalBlue", vocals: "SkyBlue" },
-  yellowsOranges: { drums: "SaddleBrown", bass: "DarkOrange", lead: "Gold", vocals: "Khaki" },
-  pinksPurples: { drums: "Indigo", bass: "Purple", lead: "DeepPink", vocals: "Plum" },
-  graysNeutrals: { drums: "Black", bass: "DimGray", lead: "SlateGray", vocals: "Gainsboro" }
-};
-
-
-var faderTypes = {
-  cross:{
-    left: {
-      vocals: [1, 0, 0, 0, 0],
-      lead:   [1, 1, 0, 0, 0],
-      bass:   [1, 1, 1, 0, 0],
-      drums:  [1, 1, 1, 1, 0]
-    },
-    right: {
-      drums:  [0, 1, 1, 1, 1],
-      bass:   [0, 0, 1, 1, 1],
-      lead:   [0, 0, 0, 1, 1],
-      vocals: [0, 0, 0, 0, 1]
-    }
-  },
-  out_in: {
-    left: {
-      vocals:  [1, 0, 0, 0, 0, 0, 0, 0, 0], 
-      lead:    [1, 1, 0, 0, 0, 0, 0, 0, 0], 
-      bass:    [1, 1, 1, 0, 0, 0, 0, 0, 0], 
-      drums:   [1, 1, 1, 1, 0.5, 0, 0, 0, 0],
-    },
-    right:{
-      drums:  [0, 0, 0, 0, 0.5, 1, 1, 1, 1],
-      bass:   [0, 0, 0, 0, 0, 0, 1, 1, 1], 
-      lead:   [0, 0, 0, 0, 0, 0, 0, 1, 1], 
-      vocals: [0, 0, 0, 0, 0, 0, 0, 0, 1]  
-    }
-  }
-};
-
-
-// Choose fader type 
-// cross (the new drum come in when the vocal drop out)
-// or out_in that cuts each intrument out before mixing the drum and putting the other side in
-// var faderGains = faderTypes.cross;
-var faderGains = faderTypes.out_in;
-window.faderMax = faderGains.left.drums.length - 1
-
-const compileTrackWithGain = (trackObj, faderIndex, side) => {
-  const coreKeys = ['drums', 'bass', 'lead', 'vocals'];
-  const compiledLayers = [];
-
-    // Determine the active theme palette for this track (fallback to neutrals)
-  const activePalette = trackObj.colorFamily && stemColorPalettes[trackObj.colorFamily] 
-    ? stemColorPalettes[trackObj.colorFamily] 
-    : stemColorPalettes.graysNeutrals;
+//@title stretch_beatz Template
+//@by stretch_beatz
+
+/*cd samples
+npx @strudel/sampler*/
+samples('http://localhost:5432/');
+let choices = await extendedSamples(); //get the key bpm etc for the samples
+
+// Midi
+const cc = await midin('Launch Control');
+const kb = await midikeys('Launch Control');
+
+// Samples
+samples('github:tidalcycles/dirt-samples/master')
+
+// Scale choice on cc(27) there is bass & lead scale and vocals to match 
+var scaleSelect = cc(27).range(0,1)
+var bass_scale = chooseWith(scaleSelect, choices.bass_scale)
+var lead_scale = chooseWith(scaleSelect, choices.lead_scale)
+var vocal_bar = chooseWith(scaleSelect, choices.bar)
+var vocal_short = chooseWith(scaleSelect, choices.short)
+var vocal_long = chooseWith(scaleSelect, choices.long)
+var vocal_cpm = chooseWith(scaleSelect, choices.cpm)
+//setcpm(72)//cpmSelect)//172
+
+
+// Drums choice on cc(47)
+var drumBank = chooseWith(cc(47), ["korgm1", "tr808", "bossdr220","tr909"])
+
+const tracks = {};
+
+// tracks.t0 = createTrack(); //empty if you want to use cc(48) to bring in layers
+
+/////////////////////////////////////
+// t1 
+tracks.t1 = createTrack(); 
+// tracks.t1.colorFamily = 'reds'; 
+tracks.t1.drums     = stack (
+s("bd sd*3").n("0")
+).bank(drumBank)
+const bassEuclidPattern = "<4@3 3 4@2 3 5>"
+tracks.t1.bass   = n(base(46269,"<4@5 5@3>",bassEuclidPattern))
+  .euclidLegato(bassEuclidPattern.mul("<2@3 1>"),8)
+  .scale(bass_scale)
+  .s("gm_synth_bass_1")
+// tracks.t1.lead   =  
+tracks.t1.vocals = stack(
+  s(vocal_bar).n("<~@2 0 3 >").euclid(bassEuclidPattern,8),
+  // s(vocal_long).n("<6!32>")
+  )
   
-  // Loop over Core Stems and apply native Masking
-  coreKeys.forEach(stem => {
-    const rawPattern = trackObj[stem] || silence;
-    const stepsArray = faderGains[side][stem];
-
-     // Identify the target color string from our palette map
-    const assignedColor = activePalette[stem];
-    
-    // Pick the step signal based on the fader index
-    const liveMaskSignal = pick(faderIndex, stepsArray);
-
-    // When liveMaskSignal is 0, the visualizer clears and the CPU stops calculating the track events.
-    const optimizedPattern = rawPattern
-      .color(assignedColor)
-      .gain(liveMaskSignal)
-      .mask(liveMaskSignal);
-    
-    compiledLayers.push(optimizedPattern);
-  });
-
-  // Loop over Dynamic Stems (Always active on selected deck)
-  Object.keys(trackObj).forEach(key => {
-    if (!coreKeys.includes(key)) {
-      compiledLayers.push(trackObj[key]);
-    }
-  });
-
-  return stack(...compiledLayers);
-};
-
-window.compileTrackWithGain = compileTrackWithGain
 
 
-function toSides(sections, faderIndex) {
-  const names = Object.keys(sections);
-  const left = [];
-  const right = [];
+/////////////////////////////////////
+// t2 
+tracks.t2 = createTrack(); 
+// tracks.t2.colorFamily = 'blues'; 
+tracks.t2.drums     = stack (
+  s("oh*4").n("0")
+).bank(drumBank)
+// tracks.t2.bass   =  
+// tracks.t2.lead   =  
+// tracks.t2.vocals = 
 
-  for (let i = 0; i < names.length - 1; i++) {
-    if (i % 2 === 0) {
-      left.push(compileTrackWithGain(sections[names[i]], faderIndex, 'left'));
-      right.push(compileTrackWithGain(sections[names[i + 1]], faderIndex, 'right'));
-    } else {
-      left.push(compileTrackWithGain(sections[names[i + 1]], faderIndex, 'left'));
-      right.push(compileTrackWithGain(sections[names[i]], faderIndex, 'right'));
-    }
-  }
-  return { left, right };
-}
-window.toSides = toSides
+////////////////////////////////////
+// Mixer
+// cc(48) is chooses how much of each track is playing
+var faderIndex = cc(48).range(0, faderMax);
 
+// Get pairs of tracks from the sections so i can mix up the tracks
+const sides = toSides(tracks, faderIndex);
+var indexSignal = cc(28).range(0, sides.left.length - 1);
+
+var leftDeck = pick(indexSignal, sides.left)
+var rightDeck = pick(indexSignal, sides.right)
+
+// Combine both active streams cleanly
+$: stack(leftDeck, rightDeck)
+  
+  .cpm(vocal_cpm) //mucks with scheduler
+  //.timeline(cc(46).range(0,100))
+  .pianoroll();
+
+
+await initHydra({ feedStrudel:1, detectAudio:true }) //strudel = s0
+
+// Load the visualisers
+const midiVis = new MidiVisualiser({cc})
+midiVis.start()
+
+// hydra code
+s1.init({src: midiVis.canvas})
+s2.initCam()
+smoothMix([s0,s1,s2],1)
+  .out(o0)
