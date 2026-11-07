@@ -91,7 +91,7 @@ class MidiVisualiser extends CachedCanvasVisualiser {
   }
 
   getTrackGeometry(col,row) {
-    const trackWidth = 100
+    const trackWidth = 50
     const rowHeight = this.canvas.height / 2
     const trackHeight = Math.min(180, rowHeight * 2 / 3)
     const horizontalMargin = 40
@@ -129,10 +129,9 @@ class MidiVisualiser extends CachedCanvasVisualiser {
 
       ctx.fillStyle = 'white'
       ctx.font = '16px monospace'
-      ctx.textAlign = 'center'
       ctx.fillText(
         ccNum,
-        x + width / 2,
+        x + 12,
         y + height + 22
       )
     }
@@ -187,11 +186,10 @@ class MidiVisualiser extends CachedCanvasVisualiser {
 
     this.ctx.fillStyle = 'white'
     this.ctx.font = '16px monospace'
-    this.ctx.textAlign = 'center'
 
     this.ctx.fillText(
       value.toFixed(2),
-      x + width / 2,
+      x - 2,
       y - 10
     )
   }
@@ -541,6 +539,227 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
 
 window.MidiVisualiser = MidiVisualiser
 window.SpaceVisualiser = SpaceVisualiser
+
+// Create this before using .vis(), .vis_text() or vis_text(); text entries share one row.
+class PatternVisualiser extends CachedCanvasVisualiser {
+  constructor({ rows = 4, width = 960, height = 540, refreshMs = 500, leftPadding = 80 } = {}) {
+    super(width, height)
+
+    if (!Number.isInteger(rows) || rows < 1) {
+      throw new RangeError('PatternVisualiser rows must be a positive integer')
+    }
+    if (!Number.isFinite(leftPadding) || leftPadding < 0) {
+      throw new RangeError('PatternVisualiser leftPadding must be a non-negative number')
+    }
+
+    window.patternVisualiser?.stop()
+    window.patternVisualiser = this
+    this.rows = rows
+    this.refreshMs = refreshMs
+    this.leftPadding = leftPadding
+    this.entries = new Map()
+    this.lastDrawTime = 0
+    this.render()
+  }
+
+  add(label, pattern, type, detailLabel, detailValue) {
+    const entries = new Map(this.entries)
+    entries.set(label, { label, pattern, type })
+    const textEntries = [...entries.values()].filter(entry => entry.type === 'text')
+    const patternCount = entries.size - textEntries.length
+    if (patternCount + (textEntries.length ? 1 : 0) > this.rows) {
+      console.warn('PatternVisualiser has no free row for', label)
+      return
+    }
+
+    const entry = { label, pattern, type, detailLabel, detailValue }
+    if (type === 'pattern') {
+      entry.events = []
+      for (let cycle = 0; cycle < 4; cycle++) {
+        entry.events.push(...pattern.queryArc(cycle, cycle + 1))
+      }
+    }
+    this.entries.set(label, entry)
+    this.render()
+  }
+
+  value(source) {
+    if (source && typeof source.queryArc === 'function') {
+      const events = source.queryArc(0, 1)
+      return events.length ? events[0].value : '—'
+    }
+    return source
+  }
+
+  clear() {
+    this.entries.clear()
+    this.render()
+  }
+
+  pitch(value) {
+    const data = value !== null && typeof value === 'object' ? value : { note: value }
+    const note = data.note ?? data.n
+    if (typeof note === 'number' && Number.isFinite(note)) return note
+    if (typeof note === 'string') {
+      const match = /^([a-g])([#sb♭♯]*)(-?\d+)$/i.exec(note)
+      if (match) {
+        const semitones = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
+        const accidentals = [...match[2]].reduce(
+          (sum, accidental) => sum + ('#s♯'.includes(accidental.toLowerCase()) ? 1 : -1),
+          0
+        )
+        return (Number(match[3]) + 1) * 12 + semitones[match[1].toLowerCase()] + accidentals
+      }
+    }
+    if (typeof data.freq === 'number' && data.freq > 0) {
+      return 69 + 12 * Math.log2(data.freq / 440)
+    }
+    return String(note ?? data.s ?? 'event')
+  }
+
+  drawPattern(entry, x, y, width, height) {
+    const ctx = this.ctx
+    ctx.fillStyle = '#181818'
+    ctx.fillRect(x, y, width, height)
+    ctx.strokeStyle = '#555'
+    for (let i = 0; i <= 4; i++) {
+      const lineX = x + width * i / 4
+      ctx.beginPath()
+      ctx.moveTo(lineX, y)
+      ctx.lineTo(lineX, y + height)
+      ctx.stroke()
+    }
+
+    const pitches = [...new Set(entry.events.map(event => this.pitch(event.value)))]
+      .sort((a, b) => {
+        if (typeof a === 'number' && typeof b === 'number') return b - a
+        if (typeof a === 'number') return -1
+        if (typeof b === 'number') return 1
+        return a.localeCompare(b)
+      })
+    const noteHeight = height / Math.max(pitches.length, 1)
+
+    for (const event of entry.events) {
+      const begin = Math.max(0, Number(event.part.begin))
+      const end = Math.min(4, Number(event.part.end))
+      if (!Number.isFinite(begin) || !Number.isFinite(end) || end <= begin) continue
+      const pitchIndex = pitches.indexOf(this.pitch(event.value))
+      const color = event.value?.color ?? '#9b7cde'
+      ctx.fillStyle = '#9b7cde'
+      ctx.fillStyle = color
+      ctx.fillRect(
+        x + width * begin / 4,
+        y + pitchIndex * noteHeight + 1,
+        Math.max(1, width * (end - begin) / 4 - 1),
+        Math.max(1, noteHeight - 2)
+      )
+    }
+  }
+
+  render() {
+    const ctx = this.ctx
+    const width = this.canvas.width
+    const rowHeight = this.canvas.height / this.rows
+    const padding = Math.min(10, rowHeight / 4, width / 4)
+    const left = Math.min(Math.max(padding, this.leftPadding), width / 2)
+    const boxWidth = width - left - padding
+    const boxHeight = rowHeight - padding * 2
+    const headerHeight = Math.min(35, boxHeight * 0.4)
+    const fontSize = Math.min(16, boxHeight * 0.3)
+    ctx.fillStyle = 'black'
+    ctx.fillRect(0, 0, width, this.canvas.height)
+    ctx.font = fontSize+'px monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+
+    const textEntries = [...this.entries.values()].filter(entry => entry.type === 'text')
+    let textDrawn = false
+    let row = 0
+    for (const entry of this.entries.values()) {
+      if (entry.type === 'text' && textDrawn) continue
+      const top = row * rowHeight + padding
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(left, top, boxWidth, boxHeight)
+      ctx.clip()
+      if (entry.type === 'pattern') {
+        let heading = entry.label
+        if (entry.detailLabel !== undefined) {
+          heading += '  |  ' + entry.detailLabel + ' = ' + String(this.value(entry.detailValue))
+        }
+        ctx.fillStyle = 'white'
+        ctx.fillText(heading, left, top + headerHeight / 2, boxWidth)
+        this.drawPattern(entry, left, top + headerHeight, boxWidth, boxHeight - headerHeight)
+      } else {
+        textDrawn = true
+        const columns = Math.min(textEntries.length, Math.max(1, Math.min(3, Math.floor(boxWidth / 160))))
+        const lines = Math.ceil(textEntries.length / columns)
+        const cellWidth = boxWidth / columns
+        const cellHeight = boxHeight / lines
+        ctx.fillStyle = '#181818'
+        ctx.fillRect(left, top, boxWidth, boxHeight)
+        ctx.fillStyle = '#ddd'
+        textEntries.forEach((textEntry, index) => {
+          const x = left + (index % columns) * cellWidth
+          const y = top + (Math.floor(index / columns) + 0.5) * cellHeight
+          ctx.fillText(textEntry.label + ' = ' + String(this.value(textEntry.pattern)), x, y, cellWidth - 5)
+        })
+      }
+      ctx.restore()
+      row++
+    }
+  }
+
+  start() {
+    if (this.running) return
+    super.start()
+    const loop = timestamp => {
+      if (!this.running) return
+      if (timestamp - this.lastDrawTime >= this.refreshMs) {
+        this.lastDrawTime = timestamp
+        this.render()
+      }
+      requestAnimationFrame(loop)
+    }
+    requestAnimationFrame(loop)
+  }
+}
+
+window.PatternVisualiser = PatternVisualiser
+
+const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailValue) => {
+  if (!window.patternVisualiser) {
+    throw new Error('Create a PatternVisualiser before using .vis(), .vis_text() or vis_text()')
+  }
+  const label = typeof labelPattern === 'string'
+    ? labelPattern
+    : labelPattern.queryArc(0, 1).map(event => String(event.value)).join(' ')
+  if (!label) throw new Error('Visualiser labels must not be empty')
+  window.patternVisualiser.add(label, pattern, type, detailLabel, detailValue)
+  return pattern
+}
+
+register('vis', (label, pattern) => registerVisualiserRow('pattern', label, pattern), false)
+register('vis_text', (label, pattern) => registerVisualiserRow('text', label, pattern), false)
+
+window.vis_text = (label, value) => {
+  if (typeof label !== 'string' || !label) {
+    throw new Error('vis_text() label must be a non-empty string')
+  }
+  return registerVisualiserRow('text', label, value)
+}
+
+// register() checks a fixed argument count, so allow both .vis(label) and
+// .vis(label, detailLabel, detailValue) on its registered pattern method.
+Object.getPrototypeOf(silence).vis = function(label, detailLabel, detailValue) {
+  if (arguments.length !== 1 && arguments.length !== 3) {
+    throw new Error('.vis() expects a label, optionally followed by a detail label and value')
+  }
+  if (arguments.length === 3 && (typeof detailLabel !== 'string' || !detailLabel)) {
+    throw new Error('.vis() detail label must be a non-empty string')
+  }
+  return registerVisualiserRow('pattern', label, this, detailLabel, detailValue)
+}
 
 
 // track structure stuff
