@@ -70,8 +70,8 @@ class MidiVisualiser extends CachedCanvasVisualiser {
 
   constructor({
     cc,
-    width = 700,
-    height = 600,
+    width = 960,
+    height = 540,
     refreshMs = 500
   }) {
 
@@ -90,32 +90,50 @@ class MidiVisualiser extends CachedCanvasVisualiser {
     this.buildStaticLayer()
   }
 
+  getTrackGeometry(col,row) {
+    const trackWidth = 100
+    const rowHeight = this.canvas.height / 2
+    const trackHeight = Math.min(180, rowHeight * 2 / 3)
+    const horizontalMargin = 40
+    const columnSpacing =
+      (this.canvas.width - horizontalMargin * 2 - trackWidth) /
+      (this.topRow.length - 1)
+
+    return {
+      x: horizontalMargin + col * columnSpacing,
+      y: row * rowHeight + (rowHeight - trackHeight) / 2,
+      width: trackWidth,
+      height: trackHeight
+    }
+  }
+
   buildStaticLayer() {
 
     const ctx = this.staticCtx
 
     ctx.fillStyle = 'black'
-    ctx.fillRect(0,0,this.width,this.height)
+    ctx.fillRect(0,0,this.canvas.width,this.canvas.height)
 
     const drawTrack = (ccNum,col,row) => {
 
-      const x = 40 + col * 80
-      const yOffset = row * 270
+      const { x, y, width, height } =
+        this.getTrackGeometry(col,row)
 
       ctx.fillStyle = '#222'
       ctx.fillRect(
         x,
-        60 + yOffset,
-        50,
-        200
+        y,
+        width,
+        height
       )
 
       ctx.fillStyle = 'white'
       ctx.font = '16px monospace'
+      ctx.textAlign = 'center'
       ctx.fillText(
         ccNum,
-        x + 12,
-        285 + yOffset
+        x + width / 2,
+        y + height + 22
       )
     }
 
@@ -154,26 +172,27 @@ class MidiVisualiser extends CachedCanvasVisualiser {
     const { value } =
       this.getCCValue(n)
 
-    const x = 40 + col * 80
-    const yOffset = row * 270
-    const h = value * 200
+    const { x, y, width, height } =
+      this.getTrackGeometry(col,row)
+    const h = value * height
 
     this.ctx.fillStyle = color
 
     this.ctx.fillRect(
       x,
-      260 + yOffset - h,
-      50,
+      y + height - h,
+      width,
       h
     )
 
     this.ctx.fillStyle = 'white'
     this.ctx.font = '16px monospace'
+    this.ctx.textAlign = 'center'
 
     this.ctx.fillText(
       value.toFixed(2),
-      x - 2,
-      50 + yOffset
+      x + width / 2,
+      y - 10
     )
   }
 
@@ -236,12 +255,17 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
     observer,
     Equator,
     KM_PER_AU,
-    width = 700,
-    height = 700,
+    width = 960,
+    height = 540,
     refreshMs = 60000
   }) {
 
     super(width,height)
+
+    this.centerX = width / 2
+    this.centerY = height / 2
+    this.outerRadius = Math.min(width, height) * 0.44
+    this.innerRadius = this.outerRadius * 220 / 260
 
     this.observer = observer
     this.Equator = Equator
@@ -276,11 +300,7 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
 
     const ctx = this.staticCtx
 
-    const cx = 350
-    const cy = 300
-
-    const outerR = 260
-    const innerR = 220
+    const { centerX: cx, centerY: cy, outerRadius, innerRadius } = this
 
     ctx.fillStyle = 'black'
     ctx.fillRect(
@@ -297,7 +317,7 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
     ctx.arc(
       cx,
       cy,
-      outerR,
+      outerRadius,
       0,
       Math.PI * 2
     )
@@ -307,7 +327,7 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
     ctx.arc(
       cx,
       cy,
-      innerR,
+      innerRadius,
       0,
       Math.PI * 2
     )
@@ -320,16 +340,16 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
         Math.PI/2
 
       const x1 =
-        cx + Math.cos(angle)*innerR
+        cx + Math.cos(angle)*innerRadius
 
       const y1 =
-        cy + Math.sin(angle)*innerR
+        cy + Math.sin(angle)*innerRadius
 
       const x2 =
-        cx + Math.cos(angle)*outerR
+        cx + Math.cos(angle)*outerRadius
 
       const y2 =
-        cy + Math.sin(angle)*outerR
+        cy + Math.sin(angle)*outerRadius
 
       ctx.beginPath()
       ctx.moveTo(x1,y1)
@@ -339,12 +359,12 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
       const tx =
         cx + Math.cos(
           angle + Math.PI/12
-        ) * 240
+        ) * (outerRadius * 240 / 260)
 
       const ty =
         cy + Math.sin(
           angle + Math.PI/12
-        ) * 240
+        ) * (outerRadius * 240 / 260)
 
       ctx.fillStyle = '#aaa'
 
@@ -434,9 +454,7 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
 
   drawPlanet(planet) {
 
-    const cx = 350
-    const cy = 300
-    const orbit = 220
+    const { centerX: cx, centerY: cy, innerRadius: orbit } = this
 
     const angle =
       (planet.ra / 24) *
