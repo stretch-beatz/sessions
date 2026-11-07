@@ -33,10 +33,6 @@ bass_scale.vis_text('bass_scale')
 // Drums choice on cc(47)
 var drum_bank = chooseWith(cc(47), ["RolandTR909", "RolandTR808", "Linn9000","AkaiLinn"])
 drum_bank.vis_text('drum_bank')
-$: stack( // Emergency Drums on cc(26 & 46)
-  s("bd").euclid(base(cc(26).range(0, 8).round()),8).every(4, jux(rev)),
-  s("hh").euclid(base(cc(46).range(0, 8).round()),8).every(2, jux(rev))
-).bank(drum_bank)
 
 const tracks = {};
 
@@ -162,6 +158,10 @@ var rightDeck = pick(indexSignal, sides.right)
 $: stack(leftDeck, rightDeck)
   .pianoroll();
 
+$: stack( // Emergency Drums on cc(26 & 46)
+  s("bd").euclid(base(cc(26).range(0, 8).round()),8).every(4, jux(rev)),
+  s("hh").euclid(base(cc(46).range(0, 8).round()),8).every(2, jux(rev))
+).bank(drum_bank)
 
 await initHydra({ feedStrudel:1, detectAudio:true }) //strudel = s0
 
