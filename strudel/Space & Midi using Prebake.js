@@ -64,7 +64,7 @@ $: space_track.pianoroll()
 await initHydra({ feedStrudel:1, detectAudio:true }) //strudel = s0
 
 // Load the visualisers
-const midiVis = new MidiVisualiser({cc})
+const midiVis = new MidiVisualiser({cc}, {47: drumBank})
 const spaceVis = new SpaceVisualiser({observer, Equator, KM_PER_AU})
 midiVis.start()
 spaceVis.start()
@@ -78,4 +78,3 @@ smoothMix([s0,s1,s2])
     ()=> a.fft[0]*(cc(42).firstCycleValues?.[0] ?? 0)
   )
   .out(o0)
-

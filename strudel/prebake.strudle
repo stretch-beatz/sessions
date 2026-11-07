@@ -73,12 +73,17 @@ class MidiVisualiser extends CachedCanvasVisualiser {
     width = 960,
     height = 540,
     refreshMs = 500
-  }) {
+  }, valueMappings = {}) {
 
     super(width, height)
 
+    if (valueMappings === null || typeof valueMappings !== 'object' || Array.isArray(valueMappings)) {
+      throw new TypeError('MidiVisualiser value mappings must be an object keyed by CC number')
+    }
+
     this.cc = cc
     this.refreshMs = refreshMs
+    this.valueMappings = valueMappings
 
     this.topRow = [21,22,23,24,25,26,27,28]
     this.bottomRow = [41,42,43,44,45,46,47,48]
@@ -186,11 +191,25 @@ class MidiVisualiser extends CachedCanvasVisualiser {
 
     this.ctx.fillStyle = 'white'
     this.ctx.font = '16px monospace'
+    this.ctx.textAlign = 'center'
+
+    let displayValue = value.toFixed(2)
+    if (Object.hasOwn(this.valueMappings, n)) {
+      const mapped = this.valueMappings[n]
+      if (mapped !== null && typeof mapped === 'object' && typeof mapped.queryArc === 'function') {
+        const events = mapped.queryArc(0, 1)
+        displayValue = events.length ? String(events[0].value) : '—'
+      } else {
+        displayValue = String(mapped)
+      }
+    }
+    const columnSpacing = (this.canvas.width - 80 - width) / (this.topRow.length - 1)
 
     this.ctx.fillText(
-      value.toFixed(2),
-      x - 2,
-      y - 10
+      displayValue,
+      x + width / 2,
+      y - 10,
+      Math.max(1, columnSpacing - 8)
     )
   }
 

@@ -28,11 +28,11 @@ samples('github:tidalcycles/dirt-samples/master')
 var scale_select = cc(27).range(0,1)
 var bass_scale = chooseWith(scale_select, ["g1:minor", "c1:minor", "c1:major"])
 var lead_scale = chooseWith(scale_select, ["g3:minor", "c3:minor", "c3:major"])
-bass_scale.vis_text('bass_scale')
+// bass_scale.vis_text('bass_scale')
 
 // Drums choice on cc(47)
 var drum_bank = chooseWith(cc(47), ["RolandTR909", "RolandTR808", "Linn9000","AkaiLinn"])
-drum_bank.vis_text('drum_bank')
+// drum_bank.vis_text('drum_bank')
 
 const tracks = {};
 
@@ -166,8 +166,11 @@ $: stack( // Emergency Drums on cc(26 & 46)
 await initHydra({ feedStrudel:1, detectAudio:true }) //strudel = s0
 
 // Load the visualisers
-const midiVis = new MidiVisualiser({cc})
-midiVis.start()
+const midiVis = new MidiVisualiser({cc}, {
+  27: bass_scale,
+  47: drum_bank
+})
+  midiVis.start()
 patternVis.start()
 
 // hydra code
