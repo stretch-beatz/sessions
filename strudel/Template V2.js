@@ -167,6 +167,8 @@ await initHydra({ feedStrudel:1, detectAudio:true }) //strudel = s0
 
 // Load the visualisers
 const midiVis = new MidiVisualiser({cc}, {
+  26: 'bd',
+  46: 'hh',
   27: bass_scale,
   47: drum_bank
 })
