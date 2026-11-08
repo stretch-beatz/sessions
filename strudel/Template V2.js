@@ -41,11 +41,23 @@ const tracks = {};
 /////////////////////////////////////
 // t1 
 tracks.t1 = createTrack(); 
-// tracks.t1.colorFamily = 'reds'; 
+tracks.t1.colorFamily = 'reds'; 
 tracks.t1.drums     = stack (
-  s("bd").n("0 1")
+  s("bd*2").n("0 1")
 ).bank(drum_bank)
- 
+
+tracks.t2 = createTrack(); 
+tracks.t2.colorFamily = 'blues'; 
+tracks.t2.drums     = stack (
+  s("oh").n("5")
+).bank(drum_bank)
+
+$: stack(
+    tracks.t1.drums.color(tracks.t1.colors.drums),
+    tracks.t2.all
+  ).pianoroll();
+
+
 /*
   let vocal_run = "<0@4 12@12>";
   let vocal_start = "<0@4>";
@@ -155,8 +167,7 @@ var leftDeck = pick(indexSignal, sides.left)
 var rightDeck = pick(indexSignal, sides.right)
 
 // Combine both active streams cleanly
-$: stack(leftDeck, rightDeck)
-  .pianoroll();
+$: stack(leftDeck, rightDeck).pianoroll()
 
 $: stack( // Emergency Drums on cc(26 & 46)
   s("bd").euclid(base(cc(26).range(0, 8).round()),8).every(4, jux(rev)),
@@ -167,10 +178,8 @@ await initHydra({ feedStrudel:1, detectAudio:true }) //strudel = s0
 
 // Load the visualisers
 const midiVis = new MidiVisualiser({cc}, {
-  26: 'bd',
-  46: 'hh',
-  27: bass_scale,
-  47: drum_bank
+  26: 'bd', 46: 'hh',
+  27: bass_scale, 47: drum_bank
 })
   midiVis.start()
 patternVis.start()

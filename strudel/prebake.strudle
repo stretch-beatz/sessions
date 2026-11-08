@@ -783,7 +783,18 @@ Object.getPrototypeOf(silence).vis = function(label, detailLabel, detailValue) {
 
 // track structure stuff
 
-window.createTrack = () => ({});
+window.createTrack = () => Object.defineProperties({}, {
+  all: {
+    get() {
+      return compileTrack(this);
+    }
+  },
+  colors: {
+    get() {
+      return trackColors(this);
+    }
+  }
+});
 
 window.stemColorPalettes = {
   reds: { drums: "Crimson", bass: "DarkRed", lead: "Tomato", vocals: "LightCoral" },
@@ -834,44 +845,39 @@ var faderTypes = {
 var faderGains = faderTypes.out_in;
 window.faderMax = faderGains.left.drums.length - 1
 
-const compileTrackWithGain = (trackObj, faderIndex, side) => {
-  const coreKeys = ['drums', 'bass', 'lead', 'vocals'];
-  const compiledLayers = [];
+const coreKeys = ['drums', 'bass', 'lead', 'vocals'];
 
-    // Determine the active theme palette for this track (fallback to neutrals)
-  const activePalette = trackObj.colorFamily && stemColorPalettes[trackObj.colorFamily] 
-    ? stemColorPalettes[trackObj.colorFamily] 
-    : stemColorPalettes.graysNeutrals;
+const trackColors = trackObj => trackObj.colorFamily && stemColorPalettes[trackObj.colorFamily]
+  ? stemColorPalettes[trackObj.colorFamily]
+  : stemColorPalettes.graysNeutrals;
+
+const compileTrackLayers = (trackObj, transformStem) => {
+  const compiledLayers = [];
+  const activePalette = trackColors(trackObj);
   
-  // Loop over Core Stems and apply native Masking
   coreKeys.forEach(stem => {
     const rawPattern = trackObj[stem] || silence;
-    const stepsArray = faderGains[side][stem];
-
-     // Identify the target color string from our palette map
-    const assignedColor = activePalette[stem];
-    
-    // Pick the step signal based on the fader index
-    const liveMaskSignal = pick(faderIndex, stepsArray);
-
-    // When liveMaskSignal is 0, the visualizer clears and the CPU stops calculating the track events.
-    const optimizedPattern = rawPattern
-      .color(assignedColor)
-      .postgain(liveMaskSignal)
-      .mask(liveMaskSignal);
-    
-    compiledLayers.push(optimizedPattern);
+    compiledLayers.push(transformStem(rawPattern.color(activePalette[stem]), stem));
   });
 
   // Loop over Dynamic Stems (Always active on selected deck)
   Object.keys(trackObj).forEach(key => {
-    if (!coreKeys.includes(key)) {
+    if (!coreKeys.includes(key) && key !== 'colorFamily') {
       compiledLayers.push(trackObj[key]);
     }
   });
 
   return stack(...compiledLayers);
 };
+
+const compileTrack = trackObj => compileTrackLayers(trackObj, pattern => pattern);
+window.compileTrack = compileTrack;
+
+const compileTrackWithGain = (trackObj, faderIndex, side) =>
+  compileTrackLayers(trackObj, (pattern, stem) => {
+    const liveMaskSignal = pick(faderIndex, faderGains[side][stem]);
+    return pattern.postgain(liveMaskSignal).mask(liveMaskSignal);
+  });
 
 window.compileTrackWithGain = compileTrackWithGain
 
