@@ -560,6 +560,7 @@ window.MidiVisualiser = MidiVisualiser
 window.SpaceVisualiser = SpaceVisualiser
 
 // Labels are unique per display type; text entries share one row.
+// .vis_value(label, offset) samples offset cycles from the current position.
 class PatternVisualiser extends CachedCanvasVisualiser {
   constructor({ rows = 4, width = 960, height = 540, refreshMs = 500, leftPadding = 80 } = {}) {
     super(width, height)
@@ -582,7 +583,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     this.render()
   }
 
-  add(label, pattern, type, detailLabel, detailValue) {
+  add(label, pattern, type, detailLabel, detailValue, offset = 0) {
     const key = JSON.stringify([type, label])
     const entries = new Map(this.entries)
     entries.set(key, { label, pattern, type })
@@ -593,7 +594,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
       return
     }
 
-    const entry = { label, pattern, type, detailLabel, detailValue }
+    const entry = { label, pattern, type, detailLabel, detailValue, offset }
     if (type === 'pattern') {
       entry.events = []
       for (let cycle = 0; cycle < 4; cycle++) {
@@ -695,7 +696,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     const cycle = entries.some(entry => entry.type === 'value') ? getTime() : undefined
     const values = new Map(entries.map(entry => [
       entry,
-      entry.type === 'value' ? String(this.liveValue(entry.pattern, cycle))
+      entry.type === 'value' ? String(this.liveValue(entry.pattern, cycle + entry.offset))
         : entry.type === 'text' ? String(this.value(entry.pattern))
         : entry.detailLabel !== undefined ? String(this.value(entry.detailValue)) : undefined
     ]))
@@ -790,7 +791,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
 
 window.PatternVisualiser = PatternVisualiser
 
-const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailValue) => {
+const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailValue, offset = 0) => {
   if (!window.patternVisualiser) {
     throw new Error('Create a PatternVisualiser before using .vis(), .vis_text(), .vis_value(), vis_text() or vis_value()')
   }
@@ -798,7 +799,7 @@ const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailV
     ? labelPattern
     : labelPattern.queryArc(0, 1).map(event => String(event.value)).join(' ')
   if (!label) throw new Error('Visualiser labels must not be empty')
-  window.patternVisualiser.add(label, pattern, type, detailLabel, detailValue)
+  window.patternVisualiser.add(label, pattern, type, detailLabel, detailValue, offset)
   return pattern
 }
 
@@ -813,11 +814,24 @@ window.vis_text = (label, value) => {
   return registerVisualiserRow('text', label, value)
 }
 
-window.vis_value = (label, value) => {
+window.vis_value = (label, value, offset = 0) => {
   if (typeof label !== 'string' || !label) {
     throw new Error('vis_value() label must be a non-empty string')
   }
-  return registerVisualiserRow('value', label, value)
+  if (!Number.isFinite(offset)) {
+    throw new TypeError('vis_value() offset must be a finite number of cycles')
+  }
+  return registerVisualiserRow('value', label, value, undefined, undefined, offset)
+}
+
+Object.getPrototypeOf(silence).vis_value = function(label, offset = 0) {
+  if (arguments.length < 1 || arguments.length > 2) {
+    throw new Error('.vis_value() expects a label and an optional cycle offset')
+  }
+  if (!Number.isFinite(offset)) {
+    throw new TypeError('.vis_value() offset must be a finite number of cycles')
+  }
+  return registerVisualiserRow('value', label, this, undefined, undefined, offset)
 }
 
 // register() checks a fixed argument count, so allow both .vis(label) and
