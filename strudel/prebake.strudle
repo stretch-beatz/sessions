@@ -561,6 +561,7 @@ window.SpaceVisualiser = SpaceVisualiser
 
 // Labels are unique per display type; text entries share one row.
 // .vis_value(label, offset) samples offset cycles from the current position.
+// .vis_cycles(label, count, offset) shows whole cycles from the current cycle.
 class PatternVisualiser extends CachedCanvasVisualiser {
   constructor({ rows = 4, width = 960, height = 540, refreshMs = 500, leftPadding = 80 } = {}) {
     super(width, height)
@@ -583,7 +584,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     this.render()
   }
 
-  add(label, pattern, type, detailLabel, detailValue, offset = 0) {
+  add(label, pattern, type, detailLabel, detailValue, offset = 0, cycles = 4) {
     const key = JSON.stringify([type, label])
     const entries = new Map(this.entries)
     entries.set(key, { label, pattern, type })
@@ -594,7 +595,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
       return
     }
 
-    const entry = { label, pattern, type, detailLabel, detailValue, offset }
+    const entry = { label, pattern, type, detailLabel, detailValue, offset, cycles }
     if (type === 'pattern') {
       entry.events = []
       for (let cycle = 0; cycle < 4; cycle++) {
@@ -650,13 +651,26 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     return String(note ?? data.s ?? 'event')
   }
 
-  drawPattern(entry, x, y, width, height) {
+  noteLabel(value) {
+    if (value !== null && typeof value === 'object') {
+      if (typeof value.note === 'string') return value.note
+      if (Number.isInteger(value.note)) {
+        const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        const pitchClass = ((value.note % 12) + 12) % 12
+        return names[pitchClass] + (Math.floor(value.note / 12) - 1)
+      }
+      return String(value.note ?? value.n ?? value.s ?? 'event')
+    }
+    return String(value)
+  }
+
+  drawPattern(entry, x, y, width, height, start = 0, cycles = 4, showLabels = false) {
     const ctx = this.ctx
     ctx.fillStyle = '#181818'
     ctx.fillRect(x, y, width, height)
     ctx.strokeStyle = '#555'
-    for (let i = 0; i <= 4; i++) {
-      const lineX = x + width * i / 4
+    for (let i = 0; i <= cycles; i++) {
+      const lineX = x + width * i / cycles
       ctx.beginPath()
       ctx.moveTo(lineX, y)
       ctx.lineTo(lineX, y + height)
@@ -673,19 +687,28 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     const noteHeight = height / Math.max(pitches.length, 1)
 
     for (const event of entry.events) {
-      const begin = Math.max(0, Number(event.part.begin))
-      const end = Math.min(4, Number(event.part.end))
+      const begin = Math.max(start, Number(event.part.begin))
+      const end = Math.min(start + cycles, Number(event.part.end))
       if (!Number.isFinite(begin) || !Number.isFinite(end) || end <= begin) continue
       const pitchIndex = pitches.indexOf(this.pitch(event.value))
       const color = event.value?.color ?? '#9b7cde'
       ctx.fillStyle = '#9b7cde'
       ctx.fillStyle = color
-      ctx.fillRect(
-        x + width * begin / 4,
-        y + pitchIndex * noteHeight + 1,
-        Math.max(1, width * (end - begin) / 4 - 1),
-        Math.max(1, noteHeight - 2)
-      )
+      const noteX = x + width * (begin - start) / cycles
+      const noteY = y + pitchIndex * noteHeight + 1
+      const noteWidth = Math.max(1, width * (end - begin) / cycles - 1)
+      const noteBoxHeight = Math.max(1, noteHeight - 2)
+      ctx.fillRect(noteX, noteY, noteWidth, noteBoxHeight)
+      if (showLabels && noteWidth >= 18 && noteBoxHeight >= 12) {
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(noteX, noteY, noteWidth, noteBoxHeight)
+        ctx.clip()
+        ctx.font = Math.min(14, noteBoxHeight * 0.75) + 'px monospace'
+        ctx.fillStyle = 'white'
+        ctx.fillText(this.noteLabel(event.value), noteX + 2, noteY + noteBoxHeight / 2, noteWidth - 4)
+        ctx.restore()
+      }
     }
   }
 
@@ -693,7 +716,11 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     const ctx = this.ctx
     const width = this.canvas.width
     const entries = [...this.entries.values()]
-    const cycle = entries.some(entry => entry.type === 'value') ? getTime() : undefined
+    const cycle = entries.some(entry => entry.type === 'value' || entry.type === 'cycles') ? getTime() : undefined
+    const cycleViews = new Map(entries.filter(entry => entry.type === 'cycles').map(entry => {
+      const start = Math.floor(cycle) + entry.offset
+      return [entry, { start, events: entry.pattern.queryArc(start, start + entry.cycles) }]
+    }))
     const values = new Map(entries.map(entry => [
       entry,
       entry.type === 'value' ? String(this.liveValue(entry.pattern, cycle + entry.offset))
@@ -704,9 +731,12 @@ class PatternVisualiser extends CachedCanvasVisualiser {
       width, this.canvas.height, this.rows, this.leftPadding,
       entries.map(entry => [
         entry.label, entry.type, entry.detailLabel, values.get(entry),
-        entry.type === 'pattern' ? entry.events.map(event => [
+        entry.type === 'cycles' ? cycleViews.get(entry).start : undefined,
+        entry.type === 'pattern' || entry.type === 'cycles'
+          ? (entry.type === 'pattern' ? entry.events : cycleViews.get(entry).events).map(event => [
           Number(event.part.begin), Number(event.part.end),
-          this.pitch(event.value), event.value?.color
+          this.pitch(event.value), event.value?.color,
+          entry.type === 'cycles' ? this.noteLabel(event.value) : undefined
         ]) : undefined
       ])
     ])
@@ -735,14 +765,21 @@ class PatternVisualiser extends CachedCanvasVisualiser {
       ctx.beginPath()
       ctx.rect(left, top, boxWidth, boxHeight)
       ctx.clip()
-      if (entry.type === 'pattern') {
+      if (entry.type === 'pattern' || entry.type === 'cycles') {
         let heading = entry.label
+        const view = cycleViews.get(entry)
+        if (view) heading += '  |  cycles ' + view.start + '–' + (view.start + entry.cycles - 1)
         if (entry.detailLabel !== undefined) {
           heading += '  |  ' + entry.detailLabel + ' = ' + values.get(entry)
         }
         ctx.fillStyle = 'white'
         ctx.fillText(heading, left, top + headerHeight / 2, boxWidth)
-        this.drawPattern(entry, left, top + headerHeight, boxWidth, boxHeight - headerHeight)
+        if (view) {
+          this.drawPattern({ events: view.events }, left, top + headerHeight,
+            boxWidth, boxHeight - headerHeight, view.start, entry.cycles, true)
+        } else {
+          this.drawPattern(entry, left, top + headerHeight, boxWidth, boxHeight - headerHeight)
+        }
       } else if (entry.type === 'value') {
         ctx.fillStyle = '#181818'
         ctx.fillRect(left, top, boxWidth, boxHeight)
@@ -791,7 +828,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
 
 window.PatternVisualiser = PatternVisualiser
 
-const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailValue, offset = 0) => {
+const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailValue, offset = 0, cycles = 4) => {
   if (!window.patternVisualiser) {
     throw new Error('Create a PatternVisualiser before using .vis(), .vis_text(), .vis_value(), vis_text() or vis_value()')
   }
@@ -799,7 +836,7 @@ const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailV
     ? labelPattern
     : labelPattern.queryArc(0, 1).map(event => String(event.value)).join(' ')
   if (!label) throw new Error('Visualiser labels must not be empty')
-  window.patternVisualiser.add(label, pattern, type, detailLabel, detailValue, offset)
+  window.patternVisualiser.add(label, pattern, type, detailLabel, detailValue, offset, cycles)
   return pattern
 }
 
@@ -834,6 +871,18 @@ Object.getPrototypeOf(silence).vis_value = function(label, offset = 0) {
   return registerVisualiserRow('value', label, this, undefined, undefined, offset)
 }
 
+Object.getPrototypeOf(silence).vis_cycles = function(label, cycles, offset = 0) {
+  if (arguments.length < 2 || arguments.length > 3 || typeof label !== 'string' || !label) {
+    throw new Error('.vis_cycles() expects a label, cycle count and optional cycle offset')
+  }
+  if (!Number.isSafeInteger(cycles) || cycles < 1) {
+    throw new RangeError('.vis_cycles() cycle count must be a positive safe integer')
+  }
+  if (!Number.isSafeInteger(offset)) {
+    throw new RangeError('.vis_cycles() offset must be a whole number of cycles')
+  }
+  return registerVisualiserRow('cycles', label, this, undefined, undefined, offset, cycles)
+}
 // register() checks a fixed argument count, so allow both .vis(label) and
 // .vis(label, detailLabel, detailValue) on its registered pattern method.
 Object.getPrototypeOf(silence).vis = function(label, detailLabel, detailValue) {
