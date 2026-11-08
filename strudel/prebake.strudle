@@ -559,7 +559,7 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
 window.MidiVisualiser = MidiVisualiser
 window.SpaceVisualiser = SpaceVisualiser
 
-// Create this before using .vis(), .vis_text() or vis_text(); text entries share one row.
+// Labels are unique per display type; text entries share one row.
 class PatternVisualiser extends CachedCanvasVisualiser {
   constructor({ rows = 4, width = 960, height = 540, refreshMs = 500, leftPadding = 80 } = {}) {
     super(width, height)
@@ -578,12 +578,14 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     this.leftPadding = leftPadding
     this.entries = new Map()
     this.lastDrawTime = 0
+    this.lastContent = undefined
     this.render()
   }
 
   add(label, pattern, type, detailLabel, detailValue) {
+    const key = JSON.stringify([type, label])
     const entries = new Map(this.entries)
-    entries.set(label, { label, pattern, type })
+    entries.set(key, { label, pattern, type })
     const textEntries = [...entries.values()].filter(entry => entry.type === 'text')
     const patternCount = entries.size - textEntries.length
     if (patternCount + (textEntries.length ? 1 : 0) > this.rows) {
@@ -598,7 +600,7 @@ class PatternVisualiser extends CachedCanvasVisualiser {
         entry.events.push(...pattern.queryArc(cycle, cycle + 1))
       }
     }
-    this.entries.set(label, entry)
+    this.entries.set(key, entry)
     this.render()
   }
 
@@ -608,6 +610,17 @@ class PatternVisualiser extends CachedCanvasVisualiser {
       return events.length ? events[0].value : '—'
     }
     return source
+  }
+
+  liveValue(source, cycle) {
+    if (!source || typeof source.queryArc !== 'function') return source
+    const events = source.queryArc(cycle, cycle + 1 / 65536)
+      .filter(event => Number(event.part.begin) <= cycle + 1e-10)
+    if (!events.length) return '—'
+    return events.map(event => {
+      const value = event.value
+      return value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value)
+    }).join(', ')
   }
 
   clear() {
@@ -678,6 +691,26 @@ class PatternVisualiser extends CachedCanvasVisualiser {
   render() {
     const ctx = this.ctx
     const width = this.canvas.width
+    const entries = [...this.entries.values()]
+    const cycle = entries.some(entry => entry.type === 'value') ? getTime() : undefined
+    const values = new Map(entries.map(entry => [
+      entry,
+      entry.type === 'value' ? String(this.liveValue(entry.pattern, cycle))
+        : entry.type === 'text' ? String(this.value(entry.pattern))
+        : entry.detailLabel !== undefined ? String(this.value(entry.detailValue)) : undefined
+    ]))
+    const content = JSON.stringify([
+      width, this.canvas.height, this.rows, this.leftPadding,
+      entries.map(entry => [
+        entry.label, entry.type, entry.detailLabel, values.get(entry),
+        entry.type === 'pattern' ? entry.events.map(event => [
+          Number(event.part.begin), Number(event.part.end),
+          this.pitch(event.value), event.value?.color
+        ]) : undefined
+      ])
+    ])
+    if (content === this.lastContent) return
+
     const rowHeight = this.canvas.height / this.rows
     const padding = Math.min(10, rowHeight / 4, width / 4)
     const left = Math.min(Math.max(padding, this.leftPadding), width / 2)
@@ -691,10 +724,10 @@ class PatternVisualiser extends CachedCanvasVisualiser {
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
 
-    const textEntries = [...this.entries.values()].filter(entry => entry.type === 'text')
+    const textEntries = entries.filter(entry => entry.type === 'text')
     let textDrawn = false
     let row = 0
-    for (const entry of this.entries.values()) {
+    for (const entry of entries) {
       if (entry.type === 'text' && textDrawn) continue
       const top = row * rowHeight + padding
       ctx.save()
@@ -704,11 +737,21 @@ class PatternVisualiser extends CachedCanvasVisualiser {
       if (entry.type === 'pattern') {
         let heading = entry.label
         if (entry.detailLabel !== undefined) {
-          heading += '  |  ' + entry.detailLabel + ' = ' + String(this.value(entry.detailValue))
+          heading += '  |  ' + entry.detailLabel + ' = ' + values.get(entry)
         }
         ctx.fillStyle = 'white'
         ctx.fillText(heading, left, top + headerHeight / 2, boxWidth)
         this.drawPattern(entry, left, top + headerHeight, boxWidth, boxHeight - headerHeight)
+      } else if (entry.type === 'value') {
+        ctx.fillStyle = '#181818'
+        ctx.fillRect(left, top, boxWidth, boxHeight)
+        ctx.fillStyle = '#ddd'
+        ctx.fillText(entry.label, left + 5, top + headerHeight / 2, boxWidth - 10)
+        ctx.font = Math.max(1, Math.min(32, (boxHeight - headerHeight) * 0.7)) + 'px monospace'
+        ctx.fillStyle = 'white'
+        ctx.fillText(values.get(entry), left + 5,
+          top + headerHeight + (boxHeight - headerHeight) / 2, boxWidth - 10)
+        ctx.font = fontSize+'px monospace'
       } else {
         textDrawn = true
         const columns = Math.min(textEntries.length, Math.max(1, Math.min(3, Math.floor(boxWidth / 160))))
@@ -721,12 +764,13 @@ class PatternVisualiser extends CachedCanvasVisualiser {
         textEntries.forEach((textEntry, index) => {
           const x = left + (index % columns) * cellWidth
           const y = top + (Math.floor(index / columns) + 0.5) * cellHeight
-          ctx.fillText(textEntry.label + ' = ' + String(this.value(textEntry.pattern)), x, y, cellWidth - 5)
+          ctx.fillText(textEntry.label + ' = ' + values.get(textEntry), x, y, cellWidth - 5)
         })
       }
       ctx.restore()
       row++
     }
+    this.lastContent = content
   }
 
   start() {
@@ -748,7 +792,7 @@ window.PatternVisualiser = PatternVisualiser
 
 const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailValue) => {
   if (!window.patternVisualiser) {
-    throw new Error('Create a PatternVisualiser before using .vis(), .vis_text() or vis_text()')
+    throw new Error('Create a PatternVisualiser before using .vis(), .vis_text(), .vis_value(), vis_text() or vis_value()')
   }
   const label = typeof labelPattern === 'string'
     ? labelPattern
@@ -760,12 +804,20 @@ const registerVisualiserRow = (type, labelPattern, pattern, detailLabel, detailV
 
 register('vis', (label, pattern) => registerVisualiserRow('pattern', label, pattern), false)
 register('vis_text', (label, pattern) => registerVisualiserRow('text', label, pattern), false)
+register('vis_value', (label, pattern) => registerVisualiserRow('value', label, pattern), false)
 
 window.vis_text = (label, value) => {
   if (typeof label !== 'string' || !label) {
     throw new Error('vis_text() label must be a non-empty string')
   }
   return registerVisualiserRow('text', label, value)
+}
+
+window.vis_value = (label, value) => {
+  if (typeof label !== 'string' || !label) {
+    throw new Error('vis_value() label must be a non-empty string')
+  }
+  return registerVisualiserRow('value', label, value)
 }
 
 // register() checks a fixed argument count, so allow both .vis(label) and
