@@ -559,6 +559,470 @@ class SpaceVisualiser extends CachedCanvasVisualiser {
 window.MidiVisualiser = MidiVisualiser
 window.SpaceVisualiser = SpaceVisualiser
 
+// Scrolls lyric events on the same cycle clock and time axis as .pianoroll().
+class LyricsVisualiser extends CachedCanvasVisualiser {
+  constructor({
+    pattern, width = 960, height = 180, cycles = 4, playhead = 0.5,
+    lanes = 1, fontSize = 28, fontFamily = 'monospace',
+    color = 'white', playheadColor = 'white'
+  } = {}) {
+    super(width, height)
+    if (pattern !== undefined && (!pattern || typeof pattern.queryArc !== 'function')) {
+      throw new TypeError('LyricsVisualiser pattern must be a Strudel pattern')
+    }
+    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+      throw new RangeError('LyricsVisualiser width and height must be positive')
+    }
+    if (!Number.isFinite(cycles) || cycles <= 0 || !Number.isFinite(playhead) || playhead < 0 || playhead > 1) {
+      throw new RangeError('LyricsVisualiser cycles must be positive and playhead must be between 0 and 1')
+    }
+    if (!Number.isSafeInteger(lanes) || lanes < 1 || !Number.isFinite(fontSize) || fontSize <= 0) {
+      throw new RangeError('LyricsVisualiser lanes and fontSize must be positive')
+    }
+    window.lyricsVisualiser?.stop()
+    window.lyricsVisualiser = this
+    this.patterns = new Map()
+    if (pattern !== undefined) this.patterns.set(Symbol('initial pattern'), { pattern, lane: 0 })
+    this.cycles = cycles
+    this.playhead = playhead
+    this.lanes = lanes
+    this.fontSize = fontSize
+    this.fontFamily = fontFamily
+    this.color = color
+    this.playheadColor = playheadColor
+    this.frame = undefined
+  }
+
+  add(label, pattern, lane = 0) {
+    if (typeof label !== 'string' || !label) {
+      throw new TypeError('LyricsVisualiser label must be a non-empty string')
+    }
+    if (!pattern || typeof pattern.queryArc !== 'function') {
+      throw new TypeError('LyricsVisualiser pattern must be a Strudel pattern')
+    }
+    if (!Number.isSafeInteger(lane) || lane < 0 || lane >= this.lanes) {
+      throw new RangeError('LyricsVisualiser lane must be an integer within the configured lanes')
+    }
+    this.patterns.set(label, { pattern, lane })
+  }
+
+  clear() {
+    this.patterns.clear()
+    this.render()
+  }
+
+  render() {
+    const time = getTime()
+    const start = time - this.cycles * this.playhead
+    const end = start + this.cycles
+    const ctx = this.ctx
+    const width = this.canvas.width
+    const height = this.canvas.height
+    ctx.clearRect(0, 0, width, height)
+    ctx.font = this.fontSize + 'px ' + this.fontFamily
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+
+    // Strudel's piano roll does not query events before playback starts.
+    for (const entry of this.patterns.values()) {
+      const events = end > 0 ? entry.pattern.queryArc(Math.max(0, start), end) : []
+      for (const event of events) {
+        const value = event.value
+        const data = value !== null && typeof value === 'object' ? value : { text: value }
+        const text = data.text ?? data.label ?? data.value
+        if (text === undefined || text === null) continue
+        const lane = data.lane ?? entry.lane
+        if (!Number.isSafeInteger(lane) || lane < 0 || lane >= this.lanes) {
+          throw new RangeError('LyricsVisualiser event lane must be an integer within the configured lanes')
+        }
+        const begin = Number((event.whole ?? event.part).begin)
+        const finish = Number(event.whole ? event.endClipped ?? event.whole.end : event.part.end)
+        if (!Number.isFinite(begin) || !Number.isFinite(finish) || finish <= begin) continue
+        const x = width * (begin - start) / this.cycles
+        const y = height * (lane + 0.5) / this.lanes
+        ctx.fillStyle = this.color
+        ctx.fillStyle = data.color ?? this.color
+        ctx.fillText(String(text), x, y)
+        if (begin <= time && time < finish) {
+          ctx.fillRect(x, y + this.fontSize * 0.6, ctx.measureText(String(text)).width, 2)
+        }
+      }
+    }
+
+    ctx.strokeStyle = this.playheadColor
+    ctx.beginPath()
+    ctx.moveTo(width * this.playhead, 0)
+    ctx.lineTo(width * this.playhead, height)
+    ctx.stroke()
+  }
+
+  start() {
+    if (this.running) return
+    super.start()
+    const loop = () => {
+      if (!this.running) return
+      this.render()
+      this.frame = requestAnimationFrame(loop)
+    }
+    this.frame = requestAnimationFrame(loop)
+  }
+
+  stop() {
+    super.stop()
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame)
+    this.frame = undefined
+  }
+}
+
+window.LyricsVisualiser = LyricsVisualiser
+
+Object.getPrototypeOf(silence).vis_lyrics = function(label, lane = 0) {
+  if (arguments.length < 1 || arguments.length > 2 || typeof label !== 'string' || !label) {
+    throw new Error('.vis_lyrics() expects a label and an optional lane')
+  }
+  if (!window.lyricsVisualiser) {
+    throw new Error('Create a LyricsVisualiser before using .vis_lyrics()')
+  }
+  window.lyricsVisualiser.add(label, this, lane)
+  return this
+}
+
+// Two 4/4 bars per page, up to four note groups, each with optional lyrics.
+class ScoreVisualiser extends CachedCanvasVisualiser {
+  constructor({ vexflow, width = 1920, height = 1080, leftPadding = 105 } = {}) {
+    super(width, height)
+    if (!vexflow?.Renderer || !vexflow?.StaveNote) {
+      throw new TypeError('ScoreVisualiser requires VexFlow; use await createScoreVisualiser()')
+    }
+    if (!Number.isFinite(width) || width < 800 || !Number.isFinite(height) || height < 200) {
+      throw new RangeError('ScoreVisualiser requires width >= 800 and height >= 200')
+    }
+    if (!Number.isFinite(leftPadding) || leftPadding < 0 || leftPadding > width / 2) {
+      throw new RangeError('ScoreVisualiser leftPadding must be between 0 and half the width')
+    }
+    this.leftPadding = leftPadding
+    this.scale = 1
+    window.scoreVisualiser?.stop()
+    window.scoreVisualiser = this
+    this.vexflow = vexflow
+    this.groups = new Map()
+    this.renderer = new vexflow.Renderer(this.staticCanvas, vexflow.Renderer.Backends.CANVAS)
+    this.scoreContext = this.renderer.getContext()
+    this.lastPage = undefined
+    this.lastRefresh = -Infinity
+    this.frame = undefined
+  }
+
+  add(label, kind, pattern) {
+    if (label && typeof label.queryArc === 'function') {
+      label = label.queryArc(0, 1).map(event => String(event.value)).join(' ')
+    }
+    if (typeof label !== 'string' || !label.trim()) {
+      throw new TypeError('Score group label must be a non-empty string or text pattern')
+    }
+    if (!['notes', 'lyrics'].includes(kind)) throw new TypeError('Score pattern must be notes or lyrics')
+    if (!pattern || typeof pattern.queryArc !== 'function') throw new TypeError('Score input must be a Strudel pattern')
+    const group = this.groups.get(label) ?? {}
+    if (!this.groups.has(label) && this.groups.size >= 4) throw new RangeError('ScoreVisualiser supports at most 4 groups')
+    group[kind] = pattern
+    this.groups.set(label, group)
+    this.lastPage = undefined
+  }
+
+  clear() {
+    this.groups.clear()
+    this.lastPage = undefined
+    this.render()
+  }
+
+  pitch(value) {
+    const data = value !== null && typeof value === 'object' ? value : { note: value }
+    let input = data.note ?? data.n ?? data.value
+    if (typeof input === 'string' && input.trim() !== '' && Number.isFinite(Number(input))) input = Number(input)
+    if (input === undefined && typeof data.freq === 'number' && data.freq > 0) {
+      input = 69 + 12 * Math.log2(data.freq / 440)
+    }
+    if (typeof input === 'number' && Number.isFinite(input)) {
+      input = Math.round(input)
+      if (input < 0 || input > 127) throw new RangeError('Score pitch must be within MIDI 0-127')
+      const names = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b']
+      return { key: names[input % 12] + '/' + (Math.floor(input / 12) - 1), midi: input }
+    }
+    const match = typeof input === 'string' && /^([a-g])([#sb♭♯]?)(-?\d+)$/i.exec(input)
+    if (!match) throw new Error('Score notes must have a pitch such as c4, eb3 or a MIDI number, got ' + JSON.stringify(value))
+    const letter = match[1].toLowerCase()
+    const accidental = match[2].toLowerCase().replace('s', '#').replace('♯', '#').replace('♭', 'b')
+    const semitones = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
+    const midi = (Number(match[3]) + 1) * 12 + semitones[letter] + (accidental === '#' ? 1 : accidental === 'b' ? -1 : 0)
+    if (midi < 0 || midi > 127) throw new RangeError('Score pitch must be within MIDI 0-127')
+    return { key: letter + accidental + '/' + match[3], midi }
+  }
+
+  grid(time, bar) {
+    const value = (time - bar) * 16
+    const rounded = Math.round(value)
+    if (!Number.isFinite(value) || Math.abs(value - rounded) > 1e-6) {
+      throw new RangeError('Score supports note boundaries on a sixteenth-note grid, not tuplets or irregular timing')
+    }
+    return rounded
+  }
+
+  barEvents(pattern, bar) {
+    if (!pattern) return []
+    return pattern.queryArc(bar, bar + 1).map(event => {
+      if (!event.whole) throw new TypeError('Score notes must be discrete events')
+      const begin = Number(event.whole.begin)
+      const end = Number(event.endClipped ?? event.whole.end)
+      const partBegin = Math.max(begin, Number(event.part.begin), bar)
+      const partEnd = Math.min(end, Number(event.part.end), bar + 1)
+      if (!Number.isFinite(begin) || !Number.isFinite(end) || end <= begin) {
+        throw new RangeError('Score note has an invalid duration')
+      }
+      return { begin, end, from: this.grid(partBegin, bar), to: this.grid(partEnd, bar),
+        pitch: this.pitch(event.value), color: event.value?.color }
+    }).filter(event => event.to > event.from).sort((a, b) => a.from - b.from)
+  }
+
+  durations(length) {
+    const choices = [
+      [16, 'w', false], [12, 'h', true], [8, 'h', false], [6, 'q', true],
+      [4, 'q', false], [3, '8', true], [2, '8', false], [1, '16', false]
+    ]
+    const result = []
+    while (length > 0) {
+      const choice = choices.find(([units]) => units <= length)
+      result.push(choice)
+      length -= choice[0]
+    }
+    return result
+  }
+
+  buildBar(events, clef) {
+    const v = this.vexflow
+    const notes = []
+    const accidentals = new Map()
+    let position = 0
+    const append = (from, to, event) => {
+      let cursor = from
+      for (const [units, duration, dotted] of this.durations(to - from)) {
+        const note = new v.StaveNote({
+          clef, keys: [event ? event.pitch.key : clef === 'bass' ? 'd/3' : 'b/4'],
+          duration: duration + (dotted ? 'd' : '') + (event ? '' : 'r')
+        })
+        if (dotted) v.Dot.buildAndAttach([note], { all: true })
+        if (event) {
+          const pitch = /^([a-g])([#b]?)(\/-?\d+)$/.exec(event.pitch.key)
+          const name = pitch[1] + pitch[3]
+          const accidental = pitch[2]
+          if (accidental) note.addModifier(new v.Accidental(accidental), 0)
+          else if (accidentals.get(name)) note.addModifier(new v.Accidental('n'), 0)
+          accidentals.set(name, accidental)
+        }
+        const color = event?.color ?? 'white'
+        const style = { fillStyle: color, strokeStyle: color }
+        note.setStyle(style)
+        note.setStemStyle(style)
+        note.setFlagStyle(style)
+        note.getModifiers().forEach(m => m.setStyle(style))
+        notes.push({ note, at: cursor, event, units })
+        cursor += units
+      }
+    }
+    for (const event of events) {
+      if (event.from < position) throw new RangeError('Score groups must be monophonic; use a separate group for overlapping notes')
+      if (event.from > position) append(position, event.from)
+      append(event.from, event.to, event)
+      position = event.to
+    }
+    if (position < 16) append(position, 16)
+    return notes
+  }
+
+  drawPage(page) {
+    const v = this.vexflow
+    const ctx = this.scoreContext
+    const raw = this.staticCtx
+    const groups = [...this.groups.entries()]
+    const rowHeight = 170
+    // Staff drawing is scaled up to use the available width, limited by canvas height.
+    const scale = Math.min(
+      (this.canvas.width - this.leftPadding - 10) / 2 / 300,
+      this.canvas.height / (Math.max(groups.length, 1) * rowHeight + 40)
+    )
+    this.scale = scale
+    raw.setTransform(1, 0, 0, 1, 0, 0)
+    raw.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    raw.fillStyle = 'black'
+    raw.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    raw.scale(scale, scale)
+    raw.fillStyle = 'white'
+    raw.font = '14px sans-serif'
+    raw.fillText('Bars ' + (page + 1) + '–' + (page + 2) + '  (4/4)', 10, 20)
+    const contentX = this.leftPadding / scale
+    const barWidth = (this.canvas.width / scale - contentX - 10) / 2
+    const staves = groups.map(([label, group], row) => {
+      const bars = Array.from({ length: 2 }, (_, i) => this.barEvents(group.notes, page + i))
+      const pitches = bars.flat().map(event => event.pitch.midi)
+      const clef = pitches.length
+        ? (pitches.reduce((a, b) => a + b, 0) / pitches.length < 60 ? 'bass' : 'treble')
+        : group.clef ?? 'treble'
+      group.clef = clef
+      raw.fillStyle = 'white'
+      raw.font = '14px sans-serif'
+      raw.fillText(label, 10, 80 + row * rowHeight, Math.max(1, contentX - 15))
+      return { label, group, bars, clef, row, last: undefined }
+    })
+    this.barAnchors = []
+    for (let i = 0; i < 2; i++) {
+      const voices = []
+      const formatted = []
+      for (const staff of staves) {
+        raw.fillStyle = 'white'
+        raw.strokeStyle = 'white'
+        const stave = new v.Stave(contentX + i * barWidth, 35 + staff.row * rowHeight, barWidth)
+        if (i === 0) stave.addClef(staff.clef).addTimeSignature('4/4')
+        stave.setContext(ctx).draw()
+        const items = this.buildBar(staff.bars[i], staff.clef)
+        const voice = new v.Voice({ numBeats: 4, beatValue: 4 }).addTickables(items.map(item => item.note))
+        voices.push(voice)
+        formatted.push({ staff, stave, items, voice })
+      }
+      if (!voices.length) continue
+      const formatter = new v.Formatter()
+      voices.forEach(voice => formatter.joinVoices([voice]))
+      formatter.formatToStave(voices, formatted[0].stave)
+      for (const { voice, stave } of formatted) {
+        raw.fillStyle = 'white'
+        raw.strokeStyle = 'white'
+        voice.draw(ctx, stave)
+      }
+      const positions = new Map()
+      for (const { items } of formatted) {
+        for (const item of items) positions.set(item.at / 16, item.note.getAbsoluteX())
+      }
+      positions.set(1, formatted[0].stave.getNoteEndX())
+      const anchors = [...positions.entries()].sort((a, b) => a[0] - b[0])
+      this.barAnchors.push(anchors)
+      for (const { staff, stave, items, voice } of formatted) {
+        raw.fillStyle = 'white'
+        raw.strokeStyle = 'white'
+        for (const item of items) {
+          if (item.event) {
+            const previous = staff.last
+            if (previous && previous.event.begin === item.event.begin && previous.event.pitch.key === item.event.pitch.key) {
+              new v.StaveTie({ firstNote: previous.note, lastNote: item.note }).setContext(ctx).draw()
+            } else if (item.event.begin < page && i === 0) {
+              new v.StaveTie({ lastNote: item.note }).setContext(ctx).draw()
+            }
+            staff.last = item
+          } else {
+            staff.last = undefined
+          }
+        }
+        if (staff.group.lyrics) {
+          const lyrics = staff.group.lyrics.queryArc(page + i, page + i + 1)
+          raw.font = '15px sans-serif'
+          raw.textBaseline = 'middle'
+          for (const event of lyrics) {
+            if (!event.whole || Number(event.whole.begin) < page + i || Number(event.whole.begin) >= page + i + 1) continue
+            const value = event.value
+            const data = value !== null && typeof value === 'object' ? value : { value }
+            const text = data.text ?? data.label ?? data.value
+            if (text === undefined || text === null) continue
+            const offset = Number(event.whole.begin) - page - i
+            const index = Math.max(0, anchors.findIndex((anchor, n) => n + 1 < anchors.length && offset < anchors[n + 1][0]))
+            const [t0, x0] = anchors[index]
+            const [t1, x1] = anchors[index + 1]
+            const x = x0 + (x1 - x0) * (offset - t0) / (t1 - t0)
+            raw.fillStyle = data.color ?? 'white'
+            raw.fillText(String(text), x, 145 + staff.row * rowHeight)
+          }
+        }
+      }
+    }
+    for (const staff of staves) {
+      if (staff.last?.event.end > page + 2) {
+        new v.StaveTie({ firstNote: staff.last.note }).setContext(ctx).draw()
+      }
+    }
+  }
+
+  render() {
+    const time = Math.max(0, getTime())
+    const page = Math.floor(time / 2) * 2
+    const now = performance.now()
+    if (page !== this.lastPage || now - this.lastRefresh >= 500) {
+      this.drawPage(page)
+      this.lastPage = page
+      this.lastRefresh = now
+    }
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
+    this.ctx.drawImage(this.staticCanvas, 0, 0)
+    const bar = Math.min(1, Math.floor(time - page))
+    const anchors = this.barAnchors[bar]
+    let x = this.leftPadding + (this.canvas.width - this.leftPadding - 10) * (time - page) / 2
+    if (anchors) {
+      const offset = time - page - bar
+      const index = Math.max(0, anchors.findIndex((anchor, n) => n + 1 < anchors.length && offset < anchors[n + 1][0]))
+      const [t0, x0] = anchors[index]
+      const [t1, x1] = anchors[index + 1]
+      x = (x0 + (x1 - x0) * (offset - t0) / (t1 - t0)) * this.scale
+    }
+    this.ctx.strokeStyle = '#d33'
+    this.ctx.beginPath()
+    this.ctx.moveTo(x, 30 * this.scale)
+    this.ctx.lineTo(x, Math.min(this.canvas.height, (30 + this.groups.size * 170) * this.scale))
+    this.ctx.stroke()
+  }
+
+  start() {
+    if (this.running) return
+    super.start()
+    const loop = () => {
+      if (!this.running) return
+      try {
+        this.render()
+      } catch (error) {
+        this.stop()
+        this.ctx.fillStyle = 'white'
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+        this.ctx.fillStyle = '#b00'
+        this.ctx.font = '16px sans-serif'
+        this.ctx.fillText('Score error: ' + error.message, 10, 30, this.canvas.width - 20)
+        console.error('ScoreVisualiser stopped:', error)
+        return
+      }
+      this.frame = requestAnimationFrame(loop)
+    }
+    this.frame = requestAnimationFrame(loop)
+  }
+
+  stop() {
+    super.stop()
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame)
+    this.frame = undefined
+  }
+}
+
+window.ScoreVisualiser = ScoreVisualiser
+window.createScoreVisualiser = async (options = {}) => {
+  const vexflow = await import('https://cdn.jsdelivr.net/npm/vexflow@5.0.0/build/esm/entry/vexflow.js')
+  await document.fonts.ready
+  return new ScoreVisualiser({ ...options, vexflow })
+}
+
+Object.getPrototypeOf(silence).vis_score_notes = function(label) {
+  if (!window.scoreVisualiser) throw new Error('Create a ScoreVisualiser before using .vis_score_notes()')
+  window.scoreVisualiser.add(label, 'notes', this)
+  return this
+}
+
+Object.getPrototypeOf(silence).vis_score_lyrics = function(label) {
+  if (!window.scoreVisualiser) throw new Error('Create a ScoreVisualiser before using .vis_score_lyrics()')
+  window.scoreVisualiser.add(label, 'lyrics', this)
+  return this
+}
+
 // Labels are unique per display type; text entries share one row.
 // .vis_value(label, offset) samples offset cycles from the current position.
 // .vis_cycles(label, count, offset) shows whole cycles from the current cycle.
@@ -1053,3 +1517,14 @@ for (const [k, v] of Object.entries(filtered)) {
 return choices;
   }
 window.extendedSamples = extendedSamples;
+
+/*
+const pickRestart = register('pickRestart', (arr, pat) => pat.pick(arr.map((x)=>x.restart(pat.collect().fmap(v=>v+1)))))
+const as = register('as', (mapping, pat) => { mapping = Array.isArray(mapping) ? mapping : [mapping];
+  return pat.fmap((v) => { v = Array.isArray(v) ? v : [v, 0];
+    return Object.fromEntries(mapping.map((prop, i) => [prop, v[i]])); }); 
+});
+
+window.pickRestart = pickRestart;
+window.as = as;
+*/
